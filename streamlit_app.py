@@ -4,6 +4,7 @@ from pathlib import Path
 import html
 import json
 import os
+import re
 import urllib.parse
 import httpx
 import pandas as pd
@@ -12,6 +13,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parent
 API = os.getenv("FLEET_API_URL", "http://127.0.0.1:8001").rstrip("/")
+PUBLIC_API = os.getenv("FLEET_PUBLIC_API_URL", "http://127.0.0.1:8001").rstrip("/")
 st.set_page_config(
     page_title="Fleet Atlas · Catalog & Signal Lab",
     page_icon="◈",
@@ -257,7 +259,9 @@ def show_catalog():
         if e.get("runbook"):
             st.link_button(
                 "Open runbook",
-                API + e["runbook"] if e["runbook"].startswith("/") else e["runbook"],
+                PUBLIC_API + e["runbook"]
+                if e["runbook"].startswith("/")
+                else e["runbook"],
             )
         for issue in e["issues"]:
             (st.error if issue["severity"] == "critical" else st.warning)(
@@ -546,9 +550,6 @@ def show_guide():
     st.caption(
         "Architecture, design decisions, test evidence, scaling, and a practical extension plan."
     )
-    illustration = ROOT / "docs/assets/architecture.svg"
-    if illustration.exists():
-        st.image(str(illustration), width="stretch")
     sections = {
         "What it does": "OVERVIEW.md",
         "Architecture": "ARCHITECTURE.md",
@@ -559,9 +560,20 @@ def show_guide():
         "Runbooks": "RUNBOOKS.md",
     }
     section = st.selectbox("Read a chapter", list(sections))
+    if section == "What it does":
+        st.image(str(ROOT / "docs/assets/architecture.svg"), width="stretch")
     file = ROOT / "docs" / sections[section]
     if file.exists():
-        st.markdown(file.read_text())
+        for part in re.split(r"(!\[[^\]]*\]\(assets/[^)]+\))", file.read_text()):
+            diagram = re.fullmatch(r"!\[[^\]]*\]\((assets/[^)]+)\)", part)
+            if diagram:
+                st.image(str(ROOT / "docs" / diagram.group(1)), width="stretch")
+            elif part.strip():
+                part = part.replace(
+                    "(../evidence/README.md)",
+                    "(https://github.com/sivalinb/fleet-telemetry-lab/tree/main/evidence)",
+                )
+                st.markdown(part)
     else:
         st.error("The guide file is missing. Restore docs/ from the repository.")
 

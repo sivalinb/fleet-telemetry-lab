@@ -47,6 +47,9 @@ def test_catalog_scenario_and_field_guide(tmp_path, monkeypatch):
         at.run()
         assert not at.exception
         assert any(t.value == "The field guide" for t in at.title)
+        at.selectbox[0].select("Architecture").run()
+        assert not at.exception
+        assert any("Runtime paths" in t.value for t in at.markdown)
 
 
 def test_api_unavailable_is_visible(monkeypatch):

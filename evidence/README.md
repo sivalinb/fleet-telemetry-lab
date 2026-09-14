@@ -5,7 +5,8 @@ This is a point-in-time record from Python 3.12.14 on Darwin arm64. All inventor
 - **56 automated tests passed**, including catalog, API, relay, and Streamlit AppTest behavior.
 - **Five live scenarios passed** against native OpenTelemetry Collector, Prometheus, Loki, and Jaeger.
 - **Abrupt Collector restart passed**: 20/20 traces and 20/20 unique log events recovered after SIGKILL and WAL replay; 12 batches were queued before the crash.
-- Docker was not installed on the local verification machine. Compose is provided as an alternative and was not executed locally. The PostgreSQL path has a dedicated GitHub Actions job; inspect the repository Actions run for its current result.
+- **Linux and PostgreSQL CI passed** in [run 34803970266](https://github.com/sivalinb/fleet-telemetry-lab/actions/runs/34803970266) for commit `835cfc6`: automated tests, official tool installation, all five live experiments, abrupt Collector recovery, and PostgreSQL reconciliation/restart persistence.
+- Docker was not installed on the local verification machine. Compose YAML, mount paths, and loopback bindings were checked; the full Compose stack was not executed locally. CI ran PostgreSQL in a container and the other backends as native Linux processes.
 
 | Scenario | Result | Completed/requested | Complete trace chains | Gateway logs |
 | --- | --- | --- | --- | --- |

@@ -45,3 +45,5 @@ Workload request counts are bounded, but repeated **Label growth** runs accumula
 The public repository contains source, invented fixtures, and generated test evidence. It contains no credentials or private infrastructure inventory. To run a shared demo, provide authentication for Streamlit and every exposed API/observability UI, use TLS, isolate the fault relay, set budgets/rate limits, and replace lab storage/retention choices according to the intended audience.
 
 `LAB_API_TOKEN` protects catalog and experiment API access plus relay controls when set. Native scripts inherit environment variables; `.env.example` is a reference and is **not automatically loaded**. Compose reads `.env` using Docker's normal interpolation. Do not commit an actual `.env` file.
+
+`FLEET_API_URL` is the API address used by the Streamlit server. `FLEET_PUBLIC_API_URL` is the browser-facing address for runbook links; it defaults to the local API port so links also work when Streamlit uses the internal Compose hostname.
