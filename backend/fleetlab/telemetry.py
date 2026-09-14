@@ -8,7 +8,7 @@ import statistics
 import time
 from uuid import uuid4
 import httpx
-from .models import Experiment
+from .runs import save_run
 
 
 def endpoints():
@@ -19,6 +19,8 @@ def endpoints():
         "collector": os.getenv("COLLECTOR_HEALTH_URL", "http://127.0.0.1:13133"),
         "relay": os.getenv("RELAY_URL", "http://127.0.0.1:8200"),
         "gateway": os.getenv("GATEWAY_URL", "http://127.0.0.1:8101"),
+        "scheduler": os.getenv("SCHEDULER_URL", "http://127.0.0.1:8102"),
+        "worker": os.getenv("WORKER_URL", "http://127.0.0.1:8103"),
     }
 
 
@@ -37,7 +39,8 @@ async def query_prom(client, query):
         if payload.get("status") != "success":
             return None
         values = [float(r["value"][1]) for r in payload["data"]["result"]]
-        return sum(v for v in values if math.isfinite(v)) if values else None
+        finite = [v for v in values if math.isfinite(v)]
+        return sum(finite) if finite else None
     except (httpx.HTTPError, ValueError, KeyError):
         return None
 
@@ -48,6 +51,8 @@ def parse_collector_metrics(text):
         "failed_exports": 0,
         "accepted_spans": 0,
         "accepted_logs": 0,
+        "queue_capacity": 0,
+        "enqueue_failures": 0,
     }
     prefixes = {
         "otelcol_exporter_queue_size": "queued_batches",
@@ -55,6 +60,9 @@ def parse_collector_metrics(text):
         "otelcol_exporter_send_failed_log_records": "failed_exports",
         "otelcol_receiver_accepted_spans": "accepted_spans",
         "otelcol_receiver_accepted_log_records": "accepted_logs",
+        "otelcol_exporter_queue_capacity": "queue_capacity",
+        "otelcol_exporter_enqueue_failed_spans": "enqueue_failures",
+        "otelcol_exporter_enqueue_failed_log_records": "enqueue_failures",
     }
     found = False
     for line in text.splitlines():
@@ -90,6 +98,8 @@ async def pipeline_status():
         "collector": "/",
         "relay": "/health",
         "gateway": "/health",
+        "scheduler": "/health",
+        "worker": "/health",
     }
     async with httpx.AsyncClient(timeout=3) as client:
 
@@ -148,6 +158,13 @@ async def pipeline_status():
                     "sum(fleetlab_requests_total{" + selector + "}) or vector(0)",
                 ),
             )
+        alerts = None
+        try:
+            response = await client.get(endpoints()["prometheus"] + "/api/v1/alerts")
+            response.raise_for_status()
+            alerts = response.json()["data"]["alerts"]
+        except (httpx.HTTPError, KeyError, ValueError):
+            pass
     return {
         "services": health,
         "metrics": {
@@ -157,6 +174,7 @@ async def pipeline_status():
         },
         "active_workload_instances": ids,
         "collector": counters,
+        "alerts": alerts,
         "origin": "live HTTP queries; metrics scoped to current workload instances",
         "observed_at": time.time(),
     }
@@ -228,25 +246,17 @@ SCENARIOS = {
 }
 
 
-async def run_experiment(factory, name, count=12):
+async def run_experiment(factory, name, count=12, run_id=None):
     if name not in SCENARIOS:
         raise ValueError("Unknown experiment")
     if not 1 <= count <= 40:
         raise ValueError("Request count must be between 1 and 40")
-    run_id = uuid4().hex
+    run_id = run_id or uuid4().hex
     start = time.time()
-    with factory.begin() as db:
-        db.add(
-            Experiment(
-                id=run_id,
-                name=name,
-                state="running",
-                results={"requested": count, "origin": "real Python HTTP workload"},
-            )
-        )
     result = {
         "id": run_id,
         "name": name,
+        "state": "running",
         "requested": count,
         "completed": 0,
         "blocked": 0,
@@ -257,11 +267,16 @@ async def run_experiment(factory, name, count=12):
         "origin": "measured lab execution; no GPU workload",
         "expected_spans_per_request": 3,
     }
+    save_run(factory, result, "Checking pipeline readiness")
     try:
         async with httpx.AsyncClient(timeout=12) as client:
             health = await client.get(endpoints()["gateway"] + "/health")
             health.raise_for_status()
             result["before"] = await pipeline_status()
+            if not all(s["status"] == "ready" for s in result["before"]["services"]):
+                raise RuntimeError(
+                    "All pipeline components must be ready before an experiment"
+                )
             if name == "backend-outage":
                 result["relay_before"] = (
                     await client.get(endpoints()["relay"] + "/health")
@@ -309,6 +324,7 @@ async def run_experiment(factory, name, count=12):
                         "collector": await collector_counters(client),
                     }
                 )
+                save_run(factory, result, "Sending instrumented Python requests")
                 if name == "backend-outage":
                     await asyncio.sleep(0.5)
             if name == "backend-outage":
@@ -320,11 +336,13 @@ async def run_experiment(factory, name, count=12):
                             "collector": await collector_counters(client),
                         }
                     )
+                    save_run(factory, result, "Waiting for backend recovery")
             else:
                 await asyncio.sleep(2)
             traces, logs = [], {"available": False, "count": None, "records": []}
             # Poll boundedly for asynchronous export, scraping, and log indexing.
             for _ in range(12):
+                save_run(factory, result, "Verifying trace chains and correlated logs")
                 traces = await asyncio.gather(
                     *(trace_evidence(client, t) for t in result["trace_ids"])
                 )
@@ -425,6 +443,11 @@ async def run_experiment(factory, name, count=12):
                 )
             result["passed"] = all(checks.values())
             result["state"] = "passed" if result["passed"] else "incomplete"
+    except asyncio.CancelledError:
+        result.update(
+            state="cancelled", passed=False, duration_s=round(time.time() - start, 2)
+        )
+        result["errors"].append("Experiment cancelled; any injected outage is cleared.")
     except Exception as e:
         result.update(
             state="failed", passed=False, duration_s=round(time.time() - start, 2)
@@ -441,8 +464,5 @@ async def run_experiment(factory, name, count=12):
                     )
             except httpx.HTTPError:
                 pass
-        with factory.begin() as db:
-            saved = db.get(Experiment, run_id)
-            saved.state = result["state"]
-            saved.results = result
+        save_run(factory, result, "Finished: " + result["state"])
     return result

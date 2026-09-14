@@ -23,6 +23,7 @@ services:
       PROMETHEUS_URL: http://prometheus:9090
       LOKI_URL: http://loki:3100
       JAEGER_URL: http://jaeger:16686
+      JAEGER_OTLP_URL: http://jaeger:4319
       COLLECTOR_HEALTH_URL: http://collector:13133
       COLLECTOR_METRICS_URL: http://collector:8888/metrics
       RELAY_URL: http://relay:8200
@@ -36,8 +37,9 @@ services:
     <<: *python
     environment:
       FLEET_API_URL: http://api:8001
+      GRADIO_SERVER_NAME: 0.0.0.0
       LAB_API_TOKEN: ${LAB_API_TOKEN:-}
-    ports: ['127.0.0.1:8501:8501']
+    ports: ['127.0.0.1:7860:7860']
     depends_on: [api]
   gateway:
     <<: *python
@@ -70,7 +72,7 @@ services:
   prometheus:
     image: prom/prometheus:v3.14.0
     command: ['--config.file=/etc/prometheus/prometheus.yaml', '--storage.tsdb.retention.time=2h']
-    volumes: ['./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro', 'prometheus-data:/prometheus']
+    volumes: ['./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro', './observability/alerts.yaml:/etc/prometheus/alerts.yaml:ro', 'prometheus-data:/prometheus']
     ports: ['127.0.0.1:9090:9090']
   loki:
     image: grafana/loki:3.7.7

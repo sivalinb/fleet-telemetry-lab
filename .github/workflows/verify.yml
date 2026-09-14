@@ -13,6 +13,7 @@ jobs:
       - run: python -m pip install -r requirements.lock && python -m pip install --no-deps -e .
       - run: python -m pytest --junitxml=evidence/unit-tests.xml
       - run: python scripts/install_tools.py
+      - run: .runtime/bin/promtool check rules observability/alerts.yaml && .runtime/bin/promtool test rules observability/alerts.test.yaml
       - name: Real backend integration and crash recovery
         run: python scripts/ci_integration.py
       - uses: actions/upload-artifact@v4

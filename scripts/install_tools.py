@@ -76,6 +76,18 @@ def install(name):
             )
             with t.extractfile(member) as source, target.open("wb") as output:
                 shutil.copyfileobj(source, output)
+            if name == "prometheus":
+                member = next(
+                    m
+                    for m in t.getmembers()
+                    if Path(m.name).name == "promtool" and m.isfile()
+                )
+                with (
+                    t.extractfile(member) as source,
+                    (TOOLS / "promtool").open("wb") as output,
+                ):
+                    shutil.copyfileobj(source, output)
+                (TOOLS / "promtool").chmod(0o755)
     target.chmod(0o755)
     print(f"Verified {name} {version}", flush=True)
     return {

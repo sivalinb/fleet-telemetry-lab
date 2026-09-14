@@ -1,0 +1,73 @@
+rule_files:
+- alerts.yaml
+evaluation_interval: 2s
+tests:
+- name: Every failure boundary fires
+  interval: 2s
+  input_series:
+  - series: up{job="fleetlab-collector",instance="collector:8888"}
+    values: 0+0x15
+  - series: otelcol_exporter_queue_size{exporter="otlphttp/traces"}
+    values: 8+0x15
+  - series: otelcol_exporter_queue_capacity{exporter="otlphttp/traces"}
+    values: 10+0x15
+  - series: otelcol_exporter_send_failed_spans_total{exporter="otlphttp/traces"}
+    values: 0+1x15
+  - series: fleetlab_requests_total{request_id="unique"}
+    values: 1+0x15
+  alert_rule_test:
+  - eval_time: 20s
+    alertname: CollectorUnavailable
+    exp_alerts:
+    - exp_labels:
+        job: fleetlab-collector
+        instance: collector:8888
+        severity: critical
+      exp_annotations:
+        summary: The main collector cannot be scraped
+  - eval_time: 20s
+    alertname: CollectorQueuePressure
+    exp_alerts:
+    - exp_labels:
+        exporter: otlphttp/traces
+        severity: warning
+      exp_annotations:
+        summary: An exporter queue exceeds 70 percent capacity
+  - eval_time: 20s
+    alertname: CollectorTerminalExportFailure
+    exp_alerts:
+    - exp_labels:
+        severity: critical
+      exp_annotations:
+        summary: Telemetry exports failed after retry processing
+  - eval_time: 20s
+    alertname: RequestIdMetricLabel
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+      exp_annotations:
+        summary: Unbounded request IDs are creating metric series
+- name: Healthy and bounded pipeline is quiet
+  interval: 2s
+  input_series:
+  - series: up{job="fleetlab-collector",instance="collector:8888"}
+    values: 1+0x15
+  - series: otelcol_exporter_queue_size{exporter="otlphttp/traces"}
+    values: 0+0x15
+  - series: otelcol_exporter_queue_capacity{exporter="otlphttp/traces"}
+    values: 10+0x15
+  - series: otelcol_exporter_send_failed_spans_total{exporter="otlphttp/traces"}
+    values: 0+0x15
+  alert_rule_test:
+  - eval_time: 20s
+    alertname: CollectorUnavailable
+    exp_alerts: []
+  - eval_time: 20s
+    alertname: CollectorQueuePressure
+    exp_alerts: []
+  - eval_time: 20s
+    alertname: CollectorTerminalExportFailure
+    exp_alerts: []
+  - eval_time: 20s
+    alertname: RequestIdMetricLabel
+    exp_alerts: []

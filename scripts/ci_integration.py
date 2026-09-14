@@ -9,12 +9,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    stack = subprocess.Popen(
-        [sys.executable, "scripts/run_stack.py", "--no-ui"], cwd=ROOT
-    )
+    stack = subprocess.Popen([sys.executable, "scripts/run_stack.py"], cwd=ROOT)
     try:
         subprocess.run(
-            [sys.executable, "scripts/verify_stack.py"], cwd=ROOT, check=True
+            [sys.executable, "scripts/verify_reliability.py"], cwd=ROOT, check=True
         )
         subprocess.run(
             [sys.executable, "scripts/verify_recovery.py"], cwd=ROOT, check=True

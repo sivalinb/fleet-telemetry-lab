@@ -1,0 +1,21 @@
+groups:
+  - name: telemetry-reliability
+    rules:
+      - alert: CollectorUnavailable
+        expr: up{job="fleetlab-collector"} == 0
+        for: 10s
+        labels: {severity: critical}
+        annotations: {summary: "The main collector cannot be scraped"}
+      - alert: CollectorQueuePressure
+        expr: otelcol_exporter_queue_size / otelcol_exporter_queue_capacity > 0.7
+        for: 10s
+        labels: {severity: warning}
+        annotations: {summary: "An exporter queue exceeds 70 percent capacity"}
+      - alert: CollectorTerminalExportFailure
+        expr: sum(increase({__name__=~"otelcol_exporter_send_failed_(spans|log_records)(_total)?"}[1m])) > 0
+        labels: {severity: critical}
+        annotations: {summary: "Telemetry exports failed after retry processing"}
+      - alert: RequestIdMetricLabel
+        expr: count(fleetlab_requests_total{request_id!=""}) > 0
+        labels: {severity: warning}
+        annotations: {summary: "Unbounded request IDs are creating metric series"}

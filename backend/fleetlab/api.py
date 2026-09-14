@@ -2,6 +2,7 @@ import asyncio
 import os
 import secrets
 import threading
+from typing import Literal
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
@@ -13,7 +14,10 @@ from sqlalchemy.exc import IntegrityError
 from .models import make_database, Audit, Experiment
 from .catalog import Batch, ingest, snapshot, impact, backstage_export
 from .fixtures import seed, scenario
-from .telemetry import pipeline_status, run_experiment
+from .telemetry import pipeline_status
+from .jobs import ExperimentManager, BusyError
+from .runs import SCENARIO_CATALOG
+from .reports import html_report, public_result
 from .contracts import validate_telemetry
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,15 +27,17 @@ def create_app(database_url=None):
     engine, factory = make_database(database_url)
     with factory.begin() as db:
         seed(db)
+    manager = ExperimentManager(factory)
 
     @asynccontextmanager
     async def lifespan(app):
         yield
+        await manager.close()
         engine.dispose()
 
     app = FastAPI(title="Fleet Atlas API", version="1.0.0", lifespan=lifespan)
     app.state.factory = factory
-    app.state.experiment_lock = asyncio.Lock()
+    app.state.experiments = manager
     catalog_lock = (
         threading.Lock()
     )  # One API worker; serialize full projection rebuilds.
@@ -146,15 +152,62 @@ def create_app(database_url=None):
 
     @app.post("/api/experiments")
     async def experiment(body: Run):
-        if app.state.experiment_lock.locked():
-            raise HTTPException(
-                409, "Another experiment is running; wait for it to finish"
-            )
-        async with app.state.experiment_lock:
-            try:
-                return await run_experiment(factory, body.name, body.count)
-            except ValueError as e:
-                raise HTTPException(422, str(e))
+        try:
+            record = await manager.start(body.name, body.count)
+            await asyncio.shield(manager.tasks[record["id"]])
+            return manager.get(record["id"])["results"]
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        except BusyError as e:
+            raise HTTPException(409, str(e))
+
+    @app.get("/api/scenarios")
+    def scenarios():
+        return SCENARIO_CATALOG
+
+    @app.post("/api/runs", status_code=202)
+    async def start_run(body: Run):
+        try:
+            return await manager.start(body.name, body.count)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        except BusyError as e:
+            raise HTTPException(409, str(e))
+
+    @app.get("/api/runs/{run_id}")
+    def read_run(run_id: str):
+        try:
+            return manager.get(run_id)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+
+    @app.post("/api/runs/{run_id}/cancel")
+    async def cancel_run(run_id: str):
+        try:
+            return await manager.cancel(run_id)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+
+    @app.get("/api/runs/{run_id}/report")
+    def report(run_id: str, format: Literal["json", "html"] = "html"):
+        import json
+
+        try:
+            result = manager.get(run_id)["results"]
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        body = (
+            html_report(result)
+            if format == "html"
+            else json.dumps(public_result(result), indent=2)
+        )
+        return Response(
+            body,
+            media_type="text/html" if format == "html" else "application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="experiment-{run_id}.{format}"'
+            },
+        )
 
     @app.get("/api/experiments")
     def experiments():

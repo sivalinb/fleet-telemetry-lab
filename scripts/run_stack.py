@@ -22,6 +22,7 @@ def native_config():
         content = content.replace("0.0.0.0", "127.0.0.1").replace(
             "/var/lib/fleetlab", str(RUNTIME)
         )
+        content = content.replace("/etc/prometheus/", str(ROOT / "observability") + "/")
         for service in ["relay", "collector"]:
             content = (
                 content.replace(service + ":", "127.0.0.1:")
@@ -40,6 +41,7 @@ def main():
         help="Run the catalog and UI; telemetry is visibly unavailable",
     )
     parser.add_argument("--no-ui", action="store_true")
+    parser.add_argument("--demo", choices=["gradio", "streamlit"], default="gradio")
     args = parser.parse_args()
     os.chdir(ROOT)
     config = native_config()
@@ -135,7 +137,9 @@ def main():
                     {"SERVICE_NAME": name},
                 )
             )
-    if not args.no_ui:
+    if not args.no_ui and args.demo == "gradio" and not args.catalog_only:
+        commands.append(("gradio", [py, "gradio_app.py"], {}))
+    elif not args.no_ui:
         commands.append(
             (
                 "streamlit",
@@ -169,7 +173,12 @@ def main():
         (RUNTIME / "processes.json").write_text(
             json.dumps({n: p.pid for n, p in processes}, indent=2)
         )
-        print("Fleet Atlas: http://127.0.0.1:8501", flush=True)
+        if not args.no_ui:
+            print(
+                "Demo: http://127.0.0.1:"
+                + ("8501" if args.catalog_only or args.demo == "streamlit" else "7860"),
+                flush=True,
+            )
         print("API: http://127.0.0.1:8001/docs · Logs: .runtime/logs", flush=True)
         while True:
             for name, process in processes:
