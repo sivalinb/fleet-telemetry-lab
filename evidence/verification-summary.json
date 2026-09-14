@@ -1,7 +1,7 @@
 {
   "platform": "Darwin arm64",
   "python": "3.12.14",
-  "unit_tests": 57,
+  "unit_tests": 77,
   "unit_failures": 0,
   "unit_errors": 0,
   "live_scenarios": {
@@ -9,9 +9,16 @@
     "label-growth": "passed",
     "contract-gate": "passed",
     "slow-worker": "passed",
-    "backend-outage": "passed"
+    "backend-outage": "passed",
+    "durable-crash": "passed",
+    "volatile-crash": "passed",
+    "retry-exhaustion": "passed",
+    "queue-saturation": "passed"
   },
   "recovery_passed": true,
   "docker_runtime_tested_locally": false,
-  "scope": "Single-machine synthetic CPU workload and fixture inventory; no production or GPU capacity claim"
+  "scope": "Single-machine synthetic CPU workload and fixture inventory; no production or GPU capacity claim",
+  "gradio_verified": true,
+  "active_cancellation_verified": true,
+  "alert_rules_verified": 4
 }
