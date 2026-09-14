@@ -20,7 +20,13 @@ The lab separates deterministic correctness checks from live delivery experiment
 | Streamlit | Change scenario / select field guide | Real API-backed state change; no UI exception |
 | Offline UI | Catalog API unavailable | Visible actionable error |
 
-## Live experiment assertions
+## Gradio reliability suite
+
+Run `python scripts/verify_reliability.py` with the full stack. It verifies all nine scenarios, an active cancellation with owned subprocess cleanup, Gradio contract acceptance/rejection, a streamed baseline, and HTML/JSON downloads. The detailed boundaries and expected-loss assertions are in [TELEMETRY_LAB.md](TELEMETRY_LAB.md).
+
+`backend/tests/test_reliability.py` adds job exclusion, cancellation, restart interruption, exception persistence, missing binaries, isolated configuration, nonfinite metrics, escaped reports, and Gradio evidence rendering. `observability/alerts.test.yaml` checks firing and quiet cases for all four Prometheus rules.
+
+## Workload experiment assertions
 
 Run `python scripts/verify_stack.py` against the full native stack. It executes five sequential runs with 12 requests each and writes `evidence/live-experiments.json`.
 
@@ -43,7 +49,8 @@ The evidence file records backlog depth, WAL bytes, recovered counts, trace IDs,
 ```sh
 python -m pytest --junitxml=evidence/unit-tests.xml
 # With the native stack already running:
-python scripts/verify_stack.py
+python scripts/verify_reliability.py
+.runtime/bin/promtool test rules observability/alerts.test.yaml
 python scripts/verify_recovery.py
 # In a clean environment, starts/stops its own full stack:
 python scripts/ci_integration.py

@@ -3,6 +3,7 @@
 | Technology | What it does here | Why it fits | Tradeoff |
 | --- | --- | --- | --- |
 | Python 3.12 | Application, adapters, orchestration, tests, documentation generation | One readable language across both projects | CPU-bound work needs processes at higher load |
+| Gradio 6.27 + Plotly | Streaming experiment controls, delivery/queue charts, history, reports | Python UI and a testable client API | Single lab runner; no user auth or durable UI job queue |
 | Streamlit + Plotly | Interactive topology, source inspector, experiments, trace waterfall | Python-native demo that is easy to run and inspect | Rerun/session model; not a general multiuser frontend |
 | FastAPI + Pydantic | HTTP contract, validation, experiment endpoints | Explicit request models and generated API documentation | One-process coordination in this lab |
 | SQLAlchemy | Source observations, projections, history, evidence | Transactions and a shared SQLite/PostgreSQL model | Migrations and optimized bulk reconciliation remain future work |
@@ -13,13 +14,14 @@
 | Prometheus 3.14.0 | Scraping, counter-series comparisons, collector self-metrics | Inspectable PromQL and direct cardinality evidence | Local retention; historical process series must be scoped carefully |
 | Loki 3.7.7 | OTLP logs and structured metadata | Query events by service/experiment without indexing every request ID | Local filesystem storage and lab retention management |
 | Jaeger 2.20.0 | Distributed trace retrieval and UI | Native macOS/Linux binaries and a direct trace API | Lab uses ephemeral memory storage |
-| pytest + Streamlit AppTest | Domain, API, relay, and UI behavior | Automated failure-path and interaction checks | AppTest does not replace visual browser inspection |
+| pytest + Gradio client + Streamlit AppTest | Domain, API, job lifecycle, relay, and UI behavior | Automated failure-path and interaction checks | AppTest does not replace visual browser inspection |
 | GitHub Actions | Linux integration and PostgreSQL checks | Reproducible evidence alongside the source | Depends on runner/package availability |
 
 `requirements.lock` pins the Python environment used for verification. `pyproject.toml` declares compatible dependency ranges. `scripts/install_tools.py` pins official native binaries and verifies their published asset digest before execution. Application code is all Python; the standard backends are existing third-party tools, not Python reimplementations.
 
 ## Useful primary references
 
+- [Gradio Blocks](https://www.gradio.app/docs/gradio/blocks) provides the Python demo composition API.
 - [Streamlit AppTest](https://docs.streamlit.io/develop/api-reference/app-testing) describes the Python UI testing surface.
 - [OpenTelemetry Collector resilience](https://opentelemetry.io/docs/collector/resiliency/) explains queue, retry, and persistent storage boundaries.
 - [Prometheus data model](https://prometheus.io/docs/concepts/data_model/) explains why every distinct label set creates a series.

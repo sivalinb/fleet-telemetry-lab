@@ -27,6 +27,8 @@ The Collector receives OTLP over HTTP. Prometheus scrapes metrics. A Python faul
 | Backend outage | Does a short export failure lose this workload? | Actual 503 responses, queued batches, drained queue, recovered traces/logs |
 | Collector crash | Does queued telemetry survive an abrupt process loss? | A killed/restarted isolated Collector, persistent storage, recovered unique events |
 
+The Gradio workbench also compares in-memory crashes, retry exhaustion, and queue saturation, with recovery canaries and explicit expected-loss assertions. See [all nine experiments](TELEMETRY_LAB.md).
+
 ## What is real, and what is modeled?
 
 **Real execution:** Python HTTP calls, SQL persistence, source reconciliation, OTLP encoding/export, PromQL and LogQL queries, trace retrieval, injected exporter failures, and process restart recovery.

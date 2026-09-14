@@ -1,6 +1,8 @@
 # Extension plan
 
-These are planned extensions, not features implemented in the current demo. Each has an acceptance test so it can become a reviewable project increment.
+The Gradio workbench already implements persistent/volatile crashes, retry expiry, queue saturation, cancellation, reports, and alert rules. See [the telemetry guide](TELEMETRY_LAB.md).
+
+The following are planned extensions, not features implemented in the current demo. Each has an acceptance test so it can become a reviewable project increment.
 
 | Order | Extension | Small deliverable | Acceptance evidence |
 | --- | --- | --- | --- |
@@ -10,7 +12,7 @@ These are planned extensions, not features implemented in the current demo. Each
 | 4 | Incident workspace | Draft incident from selected service, snapshot owner and evidence, timeline and post-incident template | Repeat action is idempotent; historical ownership retained; external sends require explicit action |
 | 5 | AI evidence assistant | Read-only tools for inventory and telemetry, cited investigation suggestions, no autonomous remediation | Eval set with correct cause, ambiguous cause, missing evidence, stale owner, malicious log content; measure abstention and citation correctness |
 | 6 | Real accelerator signals | DCGM exporter + Redfish health ingestion on an explicitly provisioned GPU host | Actual hardware/model/version recorded; compare sensor values to raw source; no synthetic performance claims |
-| 7 | Reliability experiments | Queue saturation, disk exhaustion, partial backend failure, trace sampling, retry expiry, load ramp | Expected data loss measured where guarantees end; no broad zero-loss claim |
+| 7 | Reliability experiments | Disk exhaustion, partial backend failure, trace sampling, SDK buffer loss, sustained load ramp | Expected data loss measured where guarantees end; no broad zero-loss claim |
 | 8 | Multiuser service | OIDC, tenant-scoped RBAC, TLS ingress, rate limits, durable job queue, HA database | Isolation checks, concurrent imports, restore drills, controlled rollout |
 
 ## An AI extension worth building

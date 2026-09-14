@@ -69,7 +69,7 @@ class Diagram:
 def diagrams():
     d = Diagram(
         "Know the fleet. Verify the signal.",
-        "Two Python projects, one Streamlit workspace. Fictional infrastructure; real telemetry delivery.",
+        "Two Python projects, Gradio + Streamlit demos. Fictional infrastructure; real telemetry delivery.",
         980,
     )
     d.text(48, 179, "01  /  FLEET CATALOG", 14, TEAL, 700)
@@ -183,7 +183,7 @@ def diagrams():
     d.arrow(630, 768, 685, 768)
     d.rect(995, 200, 237, 650, NAVY, NAVY)
     d.text(1017, 238, "03  /  DISCOVER", 12, "#80ddd7", 700)
-    d.text(1017, 280, "Streamlit", 29, "#fff", 700)
+    d.text(1017, 280, "Python UI", 27, "#fff", 700)
     d.text(1017, 310, "All UI logic in Python", 15, "#b5cede")
     for y, title, lines in [
         (
@@ -194,7 +194,7 @@ def diagrams():
         (
             526,
             "Signal lab",
-            ["Run five experiments", "Trace / queue visuals", "Download evidence"],
+            ["Run nine experiments", "Trace / queue visuals", "Download evidence"],
         ),
         (
             686,
@@ -415,8 +415,204 @@ def diagrams():
     d.save("scaling.svg")
 
 
+def telemetry_diagram():
+    d = Diagram(
+        "Where does the signal stop?",
+        "A Python + Gradio workbench with two real telemetry paths and inspectable recovery evidence.",
+        995,
+    )
+    d.card(
+        48,
+        166,
+        360,
+        140,
+        "01 / CHOOSE",
+        "Gradio workbench",
+        [
+            "Nine hypotheses · live progress · cancel",
+            "Compare runs · HTML and JSON reports",
+        ],
+        TEAL,
+    )
+    d.card(
+        458,
+        166,
+        360,
+        140,
+        "02 / COORDINATE",
+        "Python + FastAPI",
+        ["One active run · bounded execution", "Persist each phase · own subprocesses"],
+        BLUE,
+    )
+    d.card(
+        868,
+        166,
+        364,
+        140,
+        "03 / REMEMBER",
+        "SQL evidence",
+        ["Counts · IDs · samples · assertions", "Queued → running → terminal state"],
+        PURPLE,
+    )
+    d.arrow(408, 236, 458, 236)
+    d.arrow(818, 236, 868, 236)
+    d.text(48, 350, "MAIN PIPELINE / WORKLOAD AND INSTRUMENTATION", 14, TEAL, 700)
+    d.card(
+        48,
+        372,
+        265,
+        160,
+        "PYTHON / HTTP",
+        "Gateway → worker",
+        [
+            "Via scheduler · CPU work",
+            "W3C context across 3 services",
+            "Traces + logs + metrics",
+        ],
+        TEAL,
+    )
+    d.card(
+        365,
+        372,
+        265,
+        160,
+        "OPENTELEMETRY",
+        "Main Collector",
+        [
+            "Memory limiter + batching",
+            "Persistent export queues",
+            "Prometheus scrape endpoint",
+        ],
+        BLUE,
+    )
+    d.card(
+        682,
+        372,
+        265,
+        160,
+        "FAULT INJECTION",
+        "Main Python relay",
+        [
+            "Bounded 503 export outage",
+            "Fixed Loki / Jaeger targets",
+            "Real retry responses",
+        ],
+        PURPLE,
+    )
+    d.card(
+        999,
+        372,
+        233,
+        375,
+        "QUERY ACTUAL DELIVERY",
+        "Signal backends",
+        [
+            "Prometheus / metrics",
+            "Loki / logs",
+            "Jaeger / traces",
+            "",
+            "Main + isolated paths",
+            "share these backends.",
+            "",
+            "Unique run IDs keep",
+            "evidence attributable.",
+        ],
+        TEAL,
+    )
+    d.arrow(313, 452, 365, 452, "OTLP")
+    d.arrow(630, 452, 682, 452)
+    d.arrow(947, 452, 999, 452)
+    d.text(48, 571, "ISOLATED PIPELINE / QUEUE AND PROCESS FAILURES", 14, BLUE, 700)
+    d.card(
+        48,
+        591,
+        265,
+        160,
+        "PYTHON / DIRECT OTLP",
+        "Unique probes",
+        [
+            "One trace + log per input",
+            "Record admission / rejection",
+            "Send a canary after recovery",
+        ],
+        TEAL,
+    )
+    d.card(
+        365,
+        591,
+        265,
+        160,
+        "OWNED SUBPROCESS",
+        "Isolated Collector",
+        [
+            "Persistent OR memory queue",
+            "SIGKILL · retry expiry · full queue",
+            "No batch processor buffer",
+        ],
+        BLUE,
+    )
+    d.card(
+        682,
+        591,
+        265,
+        160,
+        "OWNED SUBPROCESS",
+        "Isolated relay",
+        [
+            "Exports blocked then restored",
+            "Own ports and queue directory",
+            "Main Collector stays running",
+        ],
+        PURPLE,
+    )
+    d.arrow(313, 671, 365, 671)
+    d.arrow(630, 671, 682, 671)
+    d.arrow(947, 671, 999, 671)
+    d.card(
+        48,
+        802,
+        360,
+        138,
+        "MEASURE",
+        "Accepted ≠ delivered",
+        [
+            "Compare input IDs with backend IDs",
+            "Preserve unavailable values and errors",
+        ],
+        BLUE,
+    )
+    d.card(
+        458,
+        802,
+        360,
+        138,
+        "VERIFY",
+        "A canary checks recovery",
+        ["Missing originals + working backend", "distinguish loss from query failure"],
+        TEAL,
+    )
+    d.card(
+        868,
+        802,
+        364,
+        138,
+        "EXPLAIN",
+        "Pass means hypothesis met",
+        [
+            "Some scenarios intentionally prove loss",
+            "No exactly-once or GPU performance claim",
+        ],
+        PURPLE,
+    )
+    d.footer(
+        "Real CPU / HTTP / OTLP execution · fictional fleet context · all custom application and orchestration code is Python"
+    )
+    d.save("telemetry.svg")
+
+
 def build_html():
     chapters = [
+        ("telemetry", "TELEMETRY_LAB.md"),
         ("overview", "OVERVIEW.md"),
         ("architecture", "ARCHITECTURE.md"),
         ("technologies", "TECHNOLOGIES.md"),
@@ -464,9 +660,10 @@ def build_html():
     (ROOT / "docs/index.html").write_text(
         '<!doctype html><html><head><meta http-equiv="refresh" content="0;url=field-guide.html"><title>Fleet Atlas guide</title></head><body><a href="field-guide.html">Read the field guide</a></body></html>'
     )
-    print("Generated four SVG diagrams and docs/field-guide.html")
+    print("Generated five SVG diagrams and docs/field-guide.html")
 
 
 if __name__ == "__main__":
     diagrams()
+    telemetry_diagram()
     build_html()
