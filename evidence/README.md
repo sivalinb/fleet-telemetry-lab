@@ -2,7 +2,7 @@
 
 This is a point-in-time record from Python 3.12.14 on Darwin arm64. All inventory is fictional and all telemetry comes from this lab. The JSON files include the measured results and assertions, not estimated outcomes.
 
-- **56 automated tests passed**, including catalog, API, relay, and Streamlit AppTest behavior.
+- **57 automated tests passed**, including catalog, API, relay, and Streamlit AppTest behavior.
 - **Five live scenarios passed** against native OpenTelemetry Collector, Prometheus, Loki, and Jaeger.
 - **Abrupt Collector restart passed**: 20/20 traces and 20/20 unique log events recovered after SIGKILL and WAL replay; 12 batches were queued before the crash.
 - **Linux and PostgreSQL CI passed** in [run 34803970266](https://github.com/sivalinb/fleet-telemetry-lab/actions/runs/34803970266) for commit `835cfc6`: automated tests, official tool installation, all five live experiments, abrupt Collector recovery, and PostgreSQL reconciliation/restart persistence.

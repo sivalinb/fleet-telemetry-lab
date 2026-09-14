@@ -148,6 +148,9 @@ def reconcile(db, now=None):
                         ],
                     }
                 )
+        absent_sources = {o.source_id for o in observations if not o.present} - {
+            o.source_id for o in active
+        }
         if not active:
             issues.append(
                 {
@@ -156,15 +159,13 @@ def reconcile(db, now=None):
                     "message": "Absent from the latest source snapshots; retained for lifecycle history.",
                 }
             )
-        elif len(active) != len(observations):
+        elif absent_sources:
             issues.append(
                 {
                     "code": "source_absent",
                     "severity": "warning",
                     "message": "A source no longer reports this record. Other observations are retained.",
-                    "sources": sorted(
-                        {o.source_id for o in observations if not o.present}
-                    ),
+                    "sources": sorted(absent_sources),
                 }
             )
         if candidates[0].kind != "team" and not resolved.get("owner"):

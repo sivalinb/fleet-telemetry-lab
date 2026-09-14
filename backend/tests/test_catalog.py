@@ -29,6 +29,23 @@ def test_same_batch_replay_is_idempotent(factory):
         assert db.scalar(select(func.count()).select_from(Entity)) == 27
 
 
+def test_source_alias_change_does_not_claim_entity_disappeared(factory):
+    records = fixture_records()["redfish-bmc"]
+    for item in records:
+        if item["entity_id"] == "node:FTL-A11":
+            item["external_id"] = "new-bmc-system-id"
+    with factory.begin() as db:
+        ingest(
+            db,
+            "redfish-bmc",
+            Batch(batch_id="alias-changed", observed_at=utcnow(), records=records),
+        )
+        data = snapshot(db)
+        nodes = [e for e in data["entities"] if e["id"] == "node:FTL-A11"]
+        assert len(nodes) == 1
+        assert not any(i["code"] == "source_absent" for i in nodes[0]["issues"])
+
+
 def test_reused_batch_id_with_different_payload_rejected(factory):
     now = utcnow()
     with factory.begin() as db:
