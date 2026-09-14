@@ -1,24 +1,62 @@
 {
-  "platform": "Darwin arm64",
-  "python": "3.12.14",
-  "unit_tests": 77,
-  "unit_failures": 0,
-  "unit_errors": 0,
-  "live_scenarios": {
-    "baseline": "passed",
-    "label-growth": "passed",
-    "contract-gate": "passed",
-    "slow-worker": "passed",
-    "backend-outage": "passed",
-    "durable-crash": "passed",
-    "volatile-crash": "passed",
-    "retry-exhaustion": "passed",
-    "queue-saturation": "passed"
+  "scope": "Synthetic local workload verification; aggregate results only",
+  "python_tests": {
+    "tests": 43,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
   },
-  "recovery_passed": true,
-  "docker_runtime_tested_locally": false,
-  "scope": "Single-machine synthetic CPU workload and fixture inventory; no production or GPU capacity claim",
-  "gradio_verified": true,
-  "active_cancellation_verified": true,
-  "alert_rules_verified": 4
+  "scenarios": [
+    {
+      "name": "baseline",
+      "state": "passed",
+      "assertions_passed": true
+    },
+    {
+      "name": "label-growth",
+      "state": "passed",
+      "assertions_passed": true
+    },
+    {
+      "name": "contract-gate",
+      "state": "passed",
+      "assertions_passed": true
+    },
+    {
+      "name": "slow-worker",
+      "state": "passed",
+      "assertions_passed": true
+    },
+    {
+      "name": "backend-outage",
+      "state": "passed",
+      "assertions_passed": true
+    },
+    {
+      "name": "durable-crash",
+      "state": "passed",
+      "assertions_passed": true
+    },
+    {
+      "name": "volatile-crash",
+      "state": "passed",
+      "assertions_passed": true
+    },
+    {
+      "name": "retry-exhaustion",
+      "state": "passed",
+      "assertions_passed": true
+    },
+    {
+      "name": "queue-saturation",
+      "state": "passed",
+      "assertions_passed": true
+    }
+  ],
+  "persistent_recovery": {
+    "requests": 20,
+    "traces_recovered": 20,
+    "unique_logs_recovered": 20,
+    "passed": true
+  }
 }

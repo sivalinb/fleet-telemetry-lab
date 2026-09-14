@@ -1,0 +1,42 @@
+[
+  {
+    "title": "Telemetry Reliability Lab",
+    "body": "Find where signals are lost. Verify what survives.",
+    "label": "Python \u00b7 Gradio \u00b7 OpenTelemetry"
+  },
+  {
+    "title": "Acceptance is one boundary",
+    "body": "SDK buffers, queue admission, retry limits, collector crashes, and backend indexing each affect delivery. A success response upstream does not establish an end-to-end result.",
+    "label": "The problem"
+  },
+  {
+    "title": "Two execution paths",
+    "body": "<div class=\"flow\"><div class=\"box\"><strong>Workload</strong><small>Gateway \u2192 scheduler \u2192 worker. Traces, logs, and metrics.</small></div><div class=\"box\"><strong>Collector</strong><small>Batches, export queues, retries, and optional persistent storage.</small></div><div class=\"box\"><strong>Backends</strong><small>Prometheus metrics. Loki logs. Jaeger traces.</small></div><div class=\"box\"><strong>Run evidence</strong><small>Isolated probes and a fault relay record admission, loss, and recovery.</small></div></div>",
+    "label": "Architecture"
+  },
+  {
+    "title": "A controlled failure, a measured result",
+    "body": "Each experiment stores its hypothesis, signal identities, queue observations, backend queries, and assertions. A fresh recovery canary distinguishes backend health from recovery of the original backlog.",
+    "label": "Evidence model"
+  },
+  {
+    "title": "Persistent storage has limits",
+    "body": "The recorded persistent crash recovered 12/12 traces and 12/12 logs. Memory-only crash and retry exhaustion recovered 0/12 originals of each signal; new canaries arrived. Saturation recovered the 4/12 signals admitted per queue.",
+    "label": "Recorded observations"
+  },
+  {
+    "title": "Nine tested boundaries",
+    "body": "Baseline delivery \u00b7 Cardinality growth \u00b7 Instrumentation gate \u00b7 Slow worker \u00b7 Backend outage \u00b7 Persistent crash \u00b7 In-memory crash \u00b7 Retry exhaustion \u00b7 Queue saturation",
+    "label": "Coverage"
+  },
+  {
+    "title": "Scaling requires more than queue size",
+    "body": "Measure ingress, backlog bytes, export capacity, delivery delay, and disk behavior. Separate failure domains. Add durable job ownership, authenticated access, and durable signal backends for shared operation.",
+    "label": "Design considerations"
+  },
+  {
+    "title": "Inspectable infrastructure engineering",
+    "body": "The repository includes Python source, configuration, tests, and recorded evidence. Synthetic CPU work and bounded failures establish specific behavior; they do not establish GPU performance, production adoption, or exactly-once delivery.",
+    "label": "Scope"
+  }
+]

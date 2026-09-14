@@ -1,10 +1,11 @@
 """A bounded fault relay: deliberately return 503 to exercise Collector retry queues."""
 
 import os
-import time
 import secrets
+import time
+
 import httpx
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 

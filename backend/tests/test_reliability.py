@@ -1,15 +1,16 @@
 import asyncio
 import json
 from pathlib import Path
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 from fleetlab.api import create_app
-from fleetlab.jobs import ExperimentManager, BusyError
+from fleetlab.isolation import allocate_ports, isolated_config, run_isolated
+from fleetlab.jobs import BusyError, ExperimentManager
 from fleetlab.models import make_database
+from fleetlab.reports import ROOT, html_report, public_result, queue_svg
 from fleetlab.runs import save_run, validate_run
-from fleetlab.isolation import isolated_config, run_isolated, allocate_ports
-from fleetlab.reports import html_report, public_result, queue_svg, ROOT
 from fleetlab.telemetry import query_prom
 
 
@@ -183,9 +184,9 @@ def test_async_run_api_reports_busy_cancel_and_validation(tmp_path):
 
 
 def test_gradio_renders_real_evidence_and_expected_loss(monkeypatch, tmp_path):
-    from fleetlab import demo
+    from fleetlab import ui
 
-    monkeypatch.setattr(demo, "REPORTS", tmp_path)
+    monkeypatch.setattr(ui, "REPORTS", tmp_path)
     result = {
         "id": "f" * 32,
         "name": "volatile-crash",
@@ -204,7 +205,7 @@ def test_gradio_renders_real_evidence_and_expected_loss(monkeypatch, tmp_path):
             "missing_event_ids": [],
         },
     }
-    rendered = demo.render_result(result)
+    rendered = ui.render_result(result)
     assert "Expected loss" in rendered[0] and "Hypothesis verified" in rendered[0]
     assert len(rendered[-1]) == 2
     assert (
@@ -215,13 +216,13 @@ def test_gradio_renders_real_evidence_and_expected_loss(monkeypatch, tmp_path):
 
 
 def test_gradio_build_and_offline_status(monkeypatch):
-    from fleetlab import demo
+    from fleetlab import ui
 
-    app = demo.build_demo()
+    app = ui.build_app()
     assert len([c for c in app.config["components"] if c["type"] == "tabitem"]) == 4
 
     async def offline(*args, **kwargs):
         raise httpx.ConnectError("offline")
 
-    monkeypatch.setattr(demo, "api", offline)
-    assert "API unavailable" in asyncio.run(demo.health_view())
+    monkeypatch.setattr(ui, "api", offline)
+    assert "API unavailable" in asyncio.run(ui.health_view())

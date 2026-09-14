@@ -5,19 +5,21 @@ accepted from requests. A probe emits one span and one log per logical input.
 """
 
 import asyncio
-from contextlib import nullcontext
 import os
-from pathlib import Path
 import socket
 import sys
 import tempfile
 import time
+from contextlib import nullcontext
+from pathlib import Path
 from uuid import uuid4
+
 import httpx
 import yaml
+
 from .contracts import resource_for
 from .runs import save_run, validate_run
-from .telemetry import parse_collector_metrics, endpoints, auth_headers
+from .telemetry import auth_headers, endpoints, parse_collector_metrics
 
 ROOT = Path(__file__).resolve().parents[2]
 ISOLATED = {"durable-crash", "volatile-crash", "retry-exhaustion", "queue-saturation"}

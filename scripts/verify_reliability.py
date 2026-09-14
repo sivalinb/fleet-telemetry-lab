@@ -2,14 +2,15 @@
 
 import json
 import os
-from pathlib import Path
 import time
+from pathlib import Path
+
 import httpx
-from gradio_client import Client
 from fleetlab.contracts import resource_for
-from fleetlab.runs import SCENARIO_CATALOG, TERMINAL
 from fleetlab.reports import public_result
+from fleetlab.runs import SCENARIO_CATALOG, TERMINAL
 from fleetlab.telemetry import auth_headers
+from gradio_client import Client
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -107,19 +108,19 @@ def main():
         assert cancelled["results"]["cleanup"]["owned_processes"] >= 2
         print("Cancellation: owned processes exited", flush=True)
 
-    demo = Client(os.getenv("GRADIO_URL", "http://127.0.0.1:7860"), verbose=False)
-    invalid = demo.predict(
+    application = Client(os.getenv("GRADIO_URL", "http://127.0.0.1:7860"), verbose=False)
+    invalid = application.predict(
         json.dumps(resource_for("gateway")),
         json.dumps({"request_id": "bad"}),
         api_name="/validate_contract",
     )
-    valid = demo.predict(
+    valid = application.predict(
         json.dumps(resource_for("gateway")),
         json.dumps({"profile": "bounded"}),
         api_name="/validate_contract",
     )
     assert not invalid["valid"] and valid["valid"]
-    output = demo.predict("baseline", 8, api_name="/run_experiment")
+    output = application.predict("baseline", 8, api_name="/run_experiment")
     assert "Hypothesis verified" in output[0]
     assert output[-2]["verified_chains"] == 8
     assert len(output[-1]) == 2 and all(Path(p).is_file() for p in output[-1])

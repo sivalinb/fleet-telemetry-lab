@@ -1,12 +1,12 @@
-"""Run the complete Python demo and native observability tools. Ctrl-C stops children."""
+"""Run the telemetry application and native observability tools. Ctrl-C stops children."""
 
 import argparse
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / ".runtime"
@@ -35,13 +35,7 @@ def native_config():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--catalog-only",
-        action="store_true",
-        help="Run the catalog and UI; telemetry is visibly unavailable",
-    )
     parser.add_argument("--no-ui", action="store_true")
-    parser.add_argument("--demo", choices=["gradio", "streamlit"], default="gradio")
     args = parser.parse_args()
     os.chdir(ROOT)
     config = native_config()
@@ -63,100 +57,79 @@ def main():
             {},
         )
     ]
-    if not args.catalog_only:
-        for tool in ["collector", "prometheus", "loki", "jaeger"]:
-            if not (RUNTIME / "bin" / tool).exists():
-                raise SystemExit(
-                    "Run python scripts/install_tools.py first, or use --catalog-only."
-                )
-        commands += [
+    for tool in ["collector", "prometheus", "loki", "jaeger"]:
+        if not (RUNTIME / "bin" / tool).exists():
+            raise SystemExit("Run python scripts/install_tools.py first.")
+    commands += [
+        (
+            "loki",
+            [
+                str(RUNTIME / "bin/loki"),
+                "-config.file=" + str(config / "loki.yaml"),
+            ],
+            {},
+        ),
+        (
+            "jaeger",
+            [
+                str(RUNTIME / "bin/jaeger"),
+                "--config=" + str(config / "jaeger.yaml"),
+            ],
+            {},
+        ),
+        (
+            "prometheus",
+            [
+                str(RUNTIME / "bin/prometheus"),
+                "--config.file=" + str(config / "prometheus.yaml"),
+                "--storage.tsdb.path=" + str(RUNTIME / "prometheus"),
+                "--web.listen-address=127.0.0.1:9090",
+                "--storage.tsdb.retention.time=2h",
+            ],
+            {},
+        ),
+        (
+            "relay",
+            [
+                py,
+                "-m",
+                "uvicorn",
+                "fleetlab.relay:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8200",
+            ],
+            {},
+        ),
+        (
+            "collector",
+            [
+                str(RUNTIME / "bin/collector"),
+                "--config=" + str(config / "collector.yaml"),
+            ],
+            {},
+        ),
+    ]
+    for name, port in [("worker", 8103), ("scheduler", 8102), ("gateway", 8101)]:
+        commands.append(
             (
-                "loki",
-                [
-                    str(RUNTIME / "bin/loki"),
-                    "-config.file=" + str(config / "loki.yaml"),
-                ],
-                {},
-            ),
-            (
-                "jaeger",
-                [
-                    str(RUNTIME / "bin/jaeger"),
-                    "--config=" + str(config / "jaeger.yaml"),
-                ],
-                {},
-            ),
-            (
-                "prometheus",
-                [
-                    str(RUNTIME / "bin/prometheus"),
-                    "--config.file=" + str(config / "prometheus.yaml"),
-                    "--storage.tsdb.path=" + str(RUNTIME / "prometheus"),
-                    "--web.listen-address=127.0.0.1:9090",
-                    "--storage.tsdb.retention.time=2h",
-                ],
-                {},
-            ),
-            (
-                "relay",
+                name,
                 [
                     py,
                     "-m",
                     "uvicorn",
-                    "fleetlab.relay:app",
+                    "fleetlab.workload:app",
                     "--host",
                     "127.0.0.1",
                     "--port",
-                    "8200",
+                    str(port),
                 ],
-                {},
-            ),
-            (
-                "collector",
-                [
-                    str(RUNTIME / "bin/collector"),
-                    "--config=" + str(config / "collector.yaml"),
-                ],
-                {},
-            ),
-        ]
-        for name, port in [("worker", 8103), ("scheduler", 8102), ("gateway", 8101)]:
-            commands.append(
-                (
-                    name,
-                    [
-                        py,
-                        "-m",
-                        "uvicorn",
-                        "fleetlab.workload:app",
-                        "--host",
-                        "127.0.0.1",
-                        "--port",
-                        str(port),
-                    ],
-                    {"SERVICE_NAME": name},
-                )
-            )
-    if not args.no_ui and args.demo == "gradio" and not args.catalog_only:
-        commands.append(("gradio", [py, "gradio_app.py"], {}))
-    elif not args.no_ui:
-        commands.append(
-            (
-                "streamlit",
-                [
-                    py,
-                    "-m",
-                    "streamlit",
-                    "run",
-                    "streamlit_app.py",
-                    "--server.address=127.0.0.1",
-                    "--server.port=8501",
-                    "--server.headless=true",
-                    "--browser.gatherUsageStats=false",
-                ],
-                {},
+                {"SERVICE_NAME": name},
             )
         )
+    if not args.no_ui:
+        commands.append(("gradio", [py, "gradio_app.py"], {}))
     processes, handles = [], []
     (RUNTIME / "logs").mkdir(exist_ok=True)
     try:
@@ -174,11 +147,7 @@ def main():
             json.dumps({n: p.pid for n, p in processes}, indent=2)
         )
         if not args.no_ui:
-            print(
-                "Demo: http://127.0.0.1:"
-                + ("8501" if args.catalog_only or args.demo == "streamlit" else "7860"),
-                flush=True,
-            )
+            print("Application: http://127.0.0.1:7860", flush=True)
         print("API: http://127.0.0.1:8001/docs · Logs: .runtime/logs", flush=True)
         while True:
             for name, process in processes:

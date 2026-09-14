@@ -1,4 +1,4 @@
-name: Verify Python catalog and telemetry lab
+name: Verify telemetry reliability lab
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
@@ -16,13 +16,14 @@ jobs:
       - run: .runtime/bin/promtool check rules observability/alerts.yaml && .runtime/bin/promtool test rules observability/alerts.test.yaml
       - name: Real backend integration and crash recovery
         run: python scripts/ci_integration.py
+      - name: Summarize verification results
+        if: always()
+        run: python scripts/summarize_verification.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: execution-evidence
-          path: |
-            evidence/
-            .runtime/logs/
+          path: evidence/verification-summary.json
   postgres:
     runs-on: ubuntu-latest
     timeout-minutes: 10

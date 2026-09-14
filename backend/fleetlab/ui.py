@@ -4,12 +4,14 @@ import asyncio
 import html
 import json
 import os
-from pathlib import Path
 import re
 import time
+from pathlib import Path
+
 import gradio as gr
 import httpx
 import plotly.graph_objects as go
+
 from .contracts import resource_for
 from .reports import delivery_summary, html_report, public_result
 from .runs import SCENARIO_CATALOG, SCENARIOS_BY_ID, TERMINAL
@@ -101,13 +103,10 @@ async def health_view():
 
 def scenario_description(name):
     s = SCENARIOS_BY_ID[name]
-    return (
-        f"### {s['question']}\n\n**Expected:** {s['expected']}\n\nAbout {s['seconds']} seconds. "
-        + (
-            "Uses an isolated collector; the main pipeline keeps running."
-            if s["group"] == "isolated"
-            else "Uses the gateway → scheduler → worker pipeline."
-        )
+    return f"### {s['question']}\n\n**Expected:** {s['expected']}\n\n" + (
+        "Uses an isolated collector; the main pipeline keeps running."
+        if s["group"] == "isolated"
+        else "Uses the gateway → scheduler → worker pipeline."
     )
 
 
@@ -345,13 +344,13 @@ async def contract_check(resource, attributes):
         raise gr.Error(str(error)) from error
 
 
-def build_demo():
+def build_app():
     with gr.Blocks(
         title="Telemetry Reliability Lab",
         analytics_enabled=False,
         fill_width=True,
         delete_cache=(3600, 3600),
-    ) as demo:
+    ) as ui:
         gr.HTML(
             '<div class="hero"><div class="eyebrow">Infrastructure field lab / 03</div><h1>Follow every signal.<br>Find where it breaks.</h1><p>Send real telemetry, introduce a controlled failure, and inspect what arrives. Nine experiments connect instrumentation choices to delivery, loss, and recovery.</p><span class="pill">Python + Gradio</span><span class="pill">OpenTelemetry</span><span class="pill">Real backend evidence</span><span class="pill">CPU lab · no GPU required</span></div>'
         )
@@ -363,7 +362,7 @@ def build_demo():
             api_name=False,
             show_progress="hidden",
         )
-        demo.load(health_view, outputs=live, api_name="pipeline_status")
+        ui.load(health_view, outputs=live, api_name="pipeline_status")
         selected_run = gr.State("")
         with gr.Tabs():
             with gr.Tab("Run an experiment"):
@@ -392,7 +391,7 @@ def build_demo():
                         )
                     with gr.Column(scale=3, min_width=400):
                         status = gr.HTML(
-                            '<div class="empty"><b>Your experiment starts here.</b><p>Try the persistent queue crash, then compare it with the in-memory queue. Both runs send real signals and record exactly what was recovered.</p></div>'
+                            '<div class="empty"><b>Your experiment starts here.</b><p>Saved results include queue occupancy, delivery counts, and per-run assertions.</p></div>'
                         )
                         with gr.Row():
                             queue = gr.Plot(queue_plot({}), show_label=False)
@@ -455,7 +454,7 @@ def build_demo():
                 load = gr.Button("Load evidence into experiment tab", variant="primary")
             with gr.Tab("Instrumentation contract"):
                 gr.Markdown(
-                    "### Keep identity in the right signal\nThis explicit Python contract requires five resource fields and rejects high-cardinality metric attributes. Try removing `request_id` from the attributes to pass validation. The workload gate uses the same function."
+                    "### Keep identity in the right signal\nThis explicit Python contract requires five resource fields and rejects high-cardinality metric attributes. The workload gate uses the same function."
                 )
                 with gr.Row():
                     resource = gr.Code(
@@ -525,7 +524,7 @@ Telemetry can be accepted upstream and still be lost later. This lab makes the b
             contract_result,
             api_name="validate_contract",
         )
-    return demo
+    return ui
 
 
 def main():
@@ -553,7 +552,7 @@ def main():
             if key.endswith("_dark") and key.removesuffix("_dark") in values
         }
     )
-    build_demo().queue(default_concurrency_limit=4).launch(
+    build_app().queue(default_concurrency_limit=4).launch(
         server_name=os.getenv("GRADIO_SERVER_NAME", "127.0.0.1"),
         server_port=int(os.getenv("GRADIO_SERVER_PORT", "7860")),
         share=False,

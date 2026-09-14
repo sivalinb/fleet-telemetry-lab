@@ -1,6 +1,6 @@
-"""Launch the Python Gradio telemetry demo."""
+"""Launch the Python Gradio telemetry ui."""
 
-from fleetlab.demo import main
+from fleetlab.ui import main
 
 if __name__ == "__main__":
     main()

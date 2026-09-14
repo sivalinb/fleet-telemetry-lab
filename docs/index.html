@@ -1,1 +1,129 @@
-<!doctype html><html><head><meta http-equiv="refresh" content="0;url=field-guide.html"><title>Fleet Atlas guide</title></head><body><a href="field-guide.html">Read the field guide</a></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Telemetry Reliability Lab — Technical Guide</title><style>
+*{box-sizing:border-box}body{margin:0;color:#17354f;background:#f7f9fb;font:18px/1.6 Arial,sans-serif}
+a{color:#007b80}h1,h2,h3{line-height:1.12;letter-spacing:-.04em}h1{font-size:46px}h2{font-size:36px}
+main.guide{max-width:1100px;margin:auto;padding:52px 40px}article{padding:32px 0;border-bottom:1px solid #d8e4eb}
+table{border-collapse:collapse;width:100%;font-size:16px}td,th{padding:12px;text-align:left;border-bottom:1px solid #d7e3eb}
+svg{max-width:100%;height:auto}pre{white-space:pre-wrap;background:#edf2f6;padding:18px;border-radius:10px;font-size:14px}code{font-size:.85em}
+.slide{display:none;min-height:100vh;padding:8vh 7vw 84px;position:relative;background:#f7f9fb}
+.slide:target{display:flex;flex-direction:column}body:not(:has(.slide:target)) .slide:first-child{display:flex;flex-direction:column}
+.slide h1{font-size:clamp(34px,4.5vw,64px);max-width:1060px;margin:14px 0 30px}
+.slide .body{font-size:clamp(19px,2vw,28px);max-width:1080px}.slide .label{font-size:12px;font-weight:bold;letter-spacing:.16em;text-transform:uppercase;color:#00828a}
+.slide:first-child,.slide:last-child{background:#102d4a;color:white}.slide:first-child .label,.slide:last-child .label{color:#80dcd7}
+.slide:first-child a,.slide:last-child a{color:#a5eae4}.slide:first-child h1{margin-top:8vh;font-size:clamp(44px,6vw,86px)}
+.slide footer{position:absolute;bottom:25px;left:7vw;right:7vw;display:flex;gap:24px;align-items:center;font-size:14px}.slide footer .author{margin-right:auto}
+.flow{display:flex;align-items:stretch;gap:14px;margin:24px 0;flex-wrap:wrap}.box{border:1px solid #cddfe7;background:white;padding:22px;border-radius:12px;flex:1;min-width:190px;font-size:20px}.box strong{display:block;margin-bottom:12px;color:#007b80}.box small{font-size:16px;line-height:1.45;display:block}
+@media(max-width:700px){.slide{padding:35px 25px 90px}.slide footer{left:25px;right:25px;gap:12px;font-size:12px}.slide h1{font-size:36px}.slide .body{font-size:21px}.slide footer .author{max-width:125px}.box{min-width:140px}main.guide{padding:25px}}
+@media print{@page{size:landscape;margin:0}.slide,.slide:target,body:not(:has(.slide:target)) .slide:first-child{display:block;min-height:100vh;break-after:page}.slide footer{display:none}}
+</style></head><body><main class="guide"><h1>Telemetry Reliability Lab</h1><article id="overview"><h1>Verify the telemetry delivery boundary</h1>
+<p>An upstream success response does not establish backend delivery. Signals can remain in SDK buffers, be rejected by a full sending queue, expire after retries, or disappear when an in-memory collector crashes.</p>
+<p>This project makes those boundaries measurable. The same fault is exercised with different queue configurations, while original signal identities and recovery canaries distinguish persisted recovery from new traffic succeeding after an outage.</p>
+<p>The implementation includes real HTTP and OTLP, bounded failure injection, durable run records, and evidence exports. It makes no GPU benchmark, production deployment, or exactly-once delivery claim.</p></article><article id="architecture"><h1>Architecture</h1>
+<p><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 995" role="img" aria-label="Where does the signal stop?"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8096ac"/></marker></defs><rect width="1280" height="995" rx="24" fill="#f1f6fc"/><text x="48" y="48" font-family="Arial, sans-serif" font-size="12" fill="#5b738d" font-weight="700">FLEET ATLAS  /  ENGINEERING FIELD GUIDE</text><text x="48" y="96" font-family="Arial, sans-serif" font-size="34" fill="#102d4a" font-weight="700">Where does the signal stop?</text><text x="48" y="128" font-family="Arial, sans-serif" font-size="17" fill="#5b738d" font-weight="400">A Python + Gradio workbench with two real telemetry paths and inspectable recovery evidence.</text><rect x="48" y="166" width="360" height="140" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="184" width="4" height="104" rx="2" fill="#007f86"/><text x="68" y="195" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">01 / CHOOSE</text><text x="68" y="224" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Gradio workbench</text><text x="68" y="251" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Nine hypotheses · live progress · cancel</text><text x="68" y="274" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Compare runs · HTML and JSON reports</text><rect x="458" y="166" width="360" height="140" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="459" y="184" width="4" height="104" rx="2" fill="#2466be"/><text x="478" y="195" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">02 / COORDINATE</text><text x="478" y="224" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Python + FastAPI</text><text x="478" y="251" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">One active run · bounded execution</text><text x="478" y="274" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Persist each phase · own subprocesses</text><rect x="868" y="166" width="364" height="140" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="869" y="184" width="4" height="104" rx="2" fill="#7055bb"/><text x="888" y="195" font-family="Arial, sans-serif" font-size="11" fill="#7055bb" font-weight="700">03 / REMEMBER</text><text x="888" y="224" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">SQL evidence</text><text x="888" y="251" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Counts · IDs · samples · assertions</text><text x="888" y="274" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Queued → running → terminal state</text><path d="M408 236 L458 236" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M818 236 L868 236" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><text x="48" y="350" font-family="Arial, sans-serif" font-size="14" fill="#007f86" font-weight="700">MAIN PIPELINE / WORKLOAD AND INSTRUMENTATION</text><rect x="48" y="372" width="265" height="160" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="390" width="4" height="124" rx="2" fill="#007f86"/><text x="68" y="401" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">PYTHON / HTTP</text><text x="68" y="430" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Gateway → worker</text><text x="68" y="457" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Via scheduler · CPU work</text><text x="68" y="480" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">W3C context across 3 services</text><text x="68" y="503" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Traces + logs + metrics</text><rect x="365" y="372" width="265" height="160" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="366" y="390" width="4" height="124" rx="2" fill="#2466be"/><text x="385" y="401" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">OPENTELEMETRY</text><text x="385" y="430" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Main Collector</text><text x="385" y="457" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Memory limiter + batching</text><text x="385" y="480" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Persistent export queues</text><text x="385" y="503" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Prometheus scrape endpoint</text><rect x="682" y="372" width="265" height="160" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="683" y="390" width="4" height="124" rx="2" fill="#7055bb"/><text x="702" y="401" font-family="Arial, sans-serif" font-size="11" fill="#7055bb" font-weight="700">FAULT INJECTION</text><text x="702" y="430" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Main Python relay</text><text x="702" y="457" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Bounded 503 export outage</text><text x="702" y="480" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Fixed Loki / Jaeger targets</text><text x="702" y="503" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Real retry responses</text><rect x="999" y="372" width="233" height="375" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="1000" y="390" width="4" height="339" rx="2" fill="#007f86"/><text x="1019" y="401" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">QUERY ACTUAL DELIVERY</text><text x="1019" y="430" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Signal backends</text><text x="1019" y="457" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Prometheus / metrics</text><text x="1019" y="480" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Loki / logs</text><text x="1019" y="503" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Jaeger / traces</text><text x="1019" y="526" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400"></text><text x="1019" y="549" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Main + isolated paths</text><text x="1019" y="572" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">share these backends.</text><text x="1019" y="595" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400"></text><text x="1019" y="618" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Unique run IDs keep</text><text x="1019" y="641" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">evidence attributable.</text><path d="M313 452 L365 452" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><text x="314.0" y="443.0" font-family="Arial, sans-serif" font-size="12" fill="#5b738d" font-weight="400">OTLP</text><path d="M630 452 L682 452" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M947 452 L999 452" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><text x="48" y="571" font-family="Arial, sans-serif" font-size="14" fill="#2466be" font-weight="700">ISOLATED PIPELINE / QUEUE AND PROCESS FAILURES</text><rect x="48" y="591" width="265" height="160" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="609" width="4" height="124" rx="2" fill="#007f86"/><text x="68" y="620" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">PYTHON / DIRECT OTLP</text><text x="68" y="649" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Unique probes</text><text x="68" y="676" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">One trace + log per input</text><text x="68" y="699" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Record admission / rejection</text><text x="68" y="722" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Send a canary after recovery</text><rect x="365" y="591" width="265" height="160" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="366" y="609" width="4" height="124" rx="2" fill="#2466be"/><text x="385" y="620" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">OWNED SUBPROCESS</text><text x="385" y="649" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Isolated Collector</text><text x="385" y="676" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Persistent OR memory queue</text><text x="385" y="699" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">SIGKILL · retry expiry · full queue</text><text x="385" y="722" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">No batch processor buffer</text><rect x="682" y="591" width="265" height="160" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="683" y="609" width="4" height="124" rx="2" fill="#7055bb"/><text x="702" y="620" font-family="Arial, sans-serif" font-size="11" fill="#7055bb" font-weight="700">OWNED SUBPROCESS</text><text x="702" y="649" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Isolated relay</text><text x="702" y="676" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Exports blocked then restored</text><text x="702" y="699" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Own ports and queue directory</text><text x="702" y="722" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Main Collector stays running</text><path d="M313 671 L365 671" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M630 671 L682 671" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M947 671 L999 671" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><rect x="48" y="802" width="360" height="138" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="820" width="4" height="102" rx="2" fill="#2466be"/><text x="68" y="831" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">MEASURE</text><text x="68" y="860" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Accepted ≠ delivered</text><text x="68" y="887" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Compare input IDs with backend IDs</text><text x="68" y="910" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Preserve unavailable values and errors</text><rect x="458" y="802" width="360" height="138" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="459" y="820" width="4" height="102" rx="2" fill="#007f86"/><text x="478" y="831" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">VERIFY</text><text x="478" y="860" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">A canary checks recovery</text><text x="478" y="887" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Missing originals + working backend</text><text x="478" y="910" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">distinguish loss from query failure</text><rect x="868" y="802" width="364" height="138" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="869" y="820" width="4" height="102" rx="2" fill="#7055bb"/><text x="888" y="831" font-family="Arial, sans-serif" font-size="11" fill="#7055bb" font-weight="700">EXPLAIN</text><text x="888" y="860" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Pass means hypothesis met</text><text x="888" y="887" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Some scenarios intentionally prove loss</text><text x="888" y="910" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">No exactly-once or GPU performance claim</text><text x="48" y="969" font-family="Arial, sans-serif" font-size="13" fill="#5b738d" font-weight="400">Real CPU / HTTP / OTLP execution · fictional fleet context · all custom application and orchestration code is Python</text></svg></p>
+<h2>Main path</h2>
+<p>Gateway, scheduler, and worker are instrumented Python services. HTTP requests produce a three-service trace chain, correlated logs, and metrics. The OpenTelemetry Collector exports metrics for Prometheus and forwards logs and traces through a Python fault relay to Loki and Jaeger. Prometheus also scrapes Collector self-metrics.</p>
+<h2>Isolated path</h2>
+<p>Crash, retry-exhaustion, and queue-saturation experiments launch a separate Collector and relay with temporary ports and storage. Each probe carries one span or log. Omitting the batch processor makes the response expose exporter-queue admission. A recovery canary checks backend availability separately from delivery of originals.</p>
+<h2>Control and persistence</h2>
+<p>FastAPI owns one experiment manager and stores progress, evidence, and terminal state in the <code>experiments</code> table. Concurrent submissions receive 409. Restarted API processes mark unfinished records interrupted. Gradio reads saved runs and submits bounded jobs; closing its browser does not cancel an API task.</p>
+<p>The telemetry package contains no catalog tables, source adapters, fixture inventory, or catalog routes. The separate catalog is optional external context, not a runtime dependency.</p>
+<h2>Storage and deployment</h2>
+<p>Native execution uses SQLite and pinned local backend binaries. Compose uses PostgreSQL and container backends. Collector queues use local file storage when configured. Jaeger traces are ephemeral; saved JSON remains after backend retention or restart removes queryable traces.</p>
+<p>Published ports bind to loopback. An optional shared API token is not user authorization. Shared deployments require authenticated access to Gradio and all APIs, TLS, and isolated fault controls. Multiple API workers require durable job ownership and worker leases before deployment.</p></article><article id="technologies"><h1>Technologies</h1>
+<table>
+<thead>
+<tr>
+<th>Technology</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python, FastAPI, Pydantic</td>
+<td>Workloads, run lifecycle, request contracts, and orchestration</td>
+</tr>
+<tr>
+<td>Gradio and Plotly</td>
+<td>Pipeline state, queue charts, delivery comparison, and evidence inspection</td>
+</tr>
+<tr>
+<td>OpenTelemetry Python SDK</td>
+<td>Metrics, logs, traces, resource attributes, and propagation</td>
+</tr>
+<tr>
+<td>OpenTelemetry Collector Contrib</td>
+<td>Receiving, batching, queues, retries, and WAL-backed export</td>
+</tr>
+<tr>
+<td>Prometheus</td>
+<td>Metrics queries, Collector visibility, and alert rule evaluation</td>
+</tr>
+<tr>
+<td>Loki</td>
+<td>Log storage and run-scoped evidence queries</td>
+</tr>
+<tr>
+<td>Jaeger</td>
+<td>Trace storage, service chains, and duration evidence</td>
+</tr>
+<tr>
+<td>SQLAlchemy, SQLite / PostgreSQL</td>
+<td>Persisted experiment state and results</td>
+</tr>
+<tr>
+<td>HTTPX, pytest, GitHub Actions</td>
+<td>Backend clients and repeatable verification</td>
+</tr>
+</tbody>
+</table>
+<p>Official backend versions and SHA-256 checks are recorded by <code>scripts/install_tools.py</code>. All application and orchestration code is Python. Infrastructure YAML configures the external backend processes.</p></article><article id="testing"><h1>Verification</h1>
+<p>Python tests cover resource contracts, forbidden metric labels, signal counters, relay failure/recovery, API authentication, request limits, run exclusion, cancellation, restart interruption, persisted errors, isolated queue configuration, HTML escaping, evidence export, and Gradio rendering. A separation regression verifies that storage contains only experiment records and catalog routes are absent.</p>
+<p><code>scripts/verify_reliability.py</code> runs all nine scenarios against actual Collector, Prometheus, Loki, and Jaeger processes. It verifies cancellation and owned-process cleanup, a streamed Gradio request, contract validation, and HTML/JSON reports. <code>scripts/verify_recovery.py</code> separately kills an isolated Collector and checks its accepted backlog after WAL replay.</p>
+<p>Prometheus rule fixtures test firing and quiet cases for scrape failure, queue pressure, terminal export failures, and unbounded labels. <code>scripts/verify_postgres.py</code> verifies experiment storage and restart persistence in a disposable PostgreSQL database.</p>
+<p>GitHub Actions runs Python, native backend integration, and PostgreSQL checks independently. The checked-in Compose configuration is an alternative deployment path; a successful native run is not evidence that the whole Compose stack was executed.</p>
+<p>Full evidence is stored locally under <code>evidence/</code> and excluded from Git. A passing loss experiment confirms the stated loss hypothesis; it does not assert delivery of every attempted signal. Absence is evaluated within a bounded observation window. Measured durations are run evidence, not delivery commitments.</p></article><article id="scaling"><h1>Scaling</h1>
+<p>Queue capacity depends on measured exporter requests per second, tolerated outage duration, and headroom. Request counts must be translated into bytes using realistic batch sizes and WAL overhead. Recovery export capacity must exceed ongoing ingestion for a backlog to drain.</p>
+<p>Place collectors by host, region, and failure domain; define signal-specific backpressure and retention. Persistent local queues cover accepted backlog through tested process restarts. They do not protect upstream buffers, exhausted retry budgets, rejected ingress, or loss of the underlying disk.</p>
+<p>Shared execution requires a durable job queue, worker leases, authenticated cancellation ownership, and cleanup supervision. Add idempotent completion and recovery of orphaned subprocesses before increasing API workers. Use durable trace storage, object-backed logs, highly available metrics, and explicit retention for longer-lived deployments.</p>
+<p>Benchmark fixed traffic mixes and payload sizes under normal load, backend stalls, queue saturation, disk pressure, and process crashes. Measure accepted/rejected/duplicate/missing IDs, per-signal bytes, p95 delivery delay, queue occupancy, drain rate, and resource usage. No sustained throughput or fleet-size limit has been established by this bounded lab.</p></article><article id="extensions"><h1>Extension opportunities</h1>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Acceptance evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Disk exhaustion and SDK shutdown faults</td>
+<td>Separate accepted, rejected, duplicate, and missing signal counts</td>
+</tr>
+<tr>
+<td>Sustained load</td>
+<td>Reproducible rates, payload sizes, resource usage, and delivery distributions</td>
+</tr>
+<tr>
+<td>Multiple collectors</td>
+<td>Failure-domain isolation and bounded recovery under collector loss</td>
+</tr>
+<tr>
+<td>Durable execution workers</td>
+<td>Job ownership, cancellation authorization, and orphan cleanup</td>
+</tr>
+<tr>
+<td>Durable signal backends</td>
+<td>Retention and restore checks across process and storage failures</td>
+</tr>
+<tr>
+<td>Optional catalog context</td>
+<td>Owner/dependency lookup through the separate catalog API, including stale or unavailable results</td>
+</tr>
+<tr>
+<td>Read-only investigation assistance</td>
+<td>Cited evidence, abstention, and hostile log-text evaluations</td>
+</tr>
+</tbody>
+</table>
+<p>These are design directions, not implemented capabilities or delivery commitments.</p></article><article id="runbooks"><h1>Operational reference</h1>
+<p>Pipeline status separates unavailable measurements from zero values. Queue counters and alerts refer to the main Collector; isolated runs preserve their own counters in evidence. Queue saturation can reject ingress before it reaches durable storage. Retry exhaustion can discard previously accepted signals.</p>
+<p>A failed run retains its configuration, phase, assertion failures, and available backend measurements. Process logs are under <code>.runtime/logs</code>; owned PIDs are recorded by the launcher. Graceful cancellation stops owned isolated subprocesses. A hard-killed API needs an external supervisor to handle any orphaned processes.</p>
+<p>Jaeger is ephemeral in this configuration. Saved trace IDs may outlive their queryable backend records. Exported JSON and HTML retain observed evidence. Repeated label-growth runs accumulate metric series and are bounded experiments rather than a sustained traffic generator.</p></article></main></body></html>

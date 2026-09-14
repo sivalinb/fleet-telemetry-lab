@@ -10,19 +10,6 @@ A healthy service and an HTTP 200 from a telemetry receiver do not establish end
 
 The main pipeline uses three instrumented Python services. The isolated experiments launch their own collector and fault relay on temporary loopback ports, with separate storage. They never stop or reconfigure the main collector. A new trace/log canary after recovery checks that the backend is functioning when older signals are absent.
 
-## Run the demo
-
-Follow the dependency installation in the repository README, then run:
-
-```sh
-python scripts/run_stack.py
-# Open http://127.0.0.1:7860
-```
-
-The default UI is Gradio. Application logic, fault orchestration, reports, and tests are Python. The existing fleet catalog demo is available with `python scripts/run_stack.py --demo streamlit` on port 8501; use one launcher at a time.
-
-Start with **Crash with a persistent queue**, then run **Crash with an in-memory queue**. Compare the saved rows in **History & comparison**. Load either run to inspect assertions, missing IDs, queue samples, and downloadable HTML/JSON reports. The report is standalone: charts are inline SVG and it needs no external service to open.
-
 ## Nine reproducible questions
 
 | Experiment | Fault or choice | What a passing run establishes |
@@ -70,7 +57,7 @@ When a run fails, inspect its first failed assertion, the backend readiness stri
 
 ## Test cases
 
-`python -m pytest` exercises catalog and API behavior plus job exclusion, cancellation, restart interruption, error persistence, configuration boundaries, report escaping, unavailable metrics, and Gradio rendering. `python scripts/verify_reliability.py` runs all nine real scenarios, cancels an active isolated run, then tests a streamed Gradio baseline, contract validation, and both report downloads. It writes inspectable JSON to `evidence/`.
+`python -m pytest` exercises API behavior plus job exclusion, cancellation, restart interruption, error persistence, configuration boundaries, report escaping, unavailable metrics, and Gradio rendering. `python scripts/verify_reliability.py` runs all nine real scenarios, cancels an active isolated run, then tests a streamed Gradio baseline, contract validation, and both report downloads. It writes inspectable JSON to `evidence/`.
 
 Local verification used Python 3.12 on macOS arm64. GitHub Actions repeats native integration on Linux and checks PostgreSQL separately. Compose remains an optional local deployment path; the recorded evidence distinguishes it from native execution.
 

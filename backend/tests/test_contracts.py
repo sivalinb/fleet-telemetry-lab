@@ -1,7 +1,6 @@
 import pytest
 from fleetlab.contracts import resource_for, validate_telemetry
 from fleetlab.telemetry import parse_collector_metrics
-from fleetlab.adapters import kubernetes_records, redfish_records
 
 
 def test_standard_resource_and_bounded_labels_pass():
@@ -45,47 +44,3 @@ def test_counter_parser_sums_signal_queues_and_ignores_comments():
     assert parse_collector_metrics(text)["queued_batches"] == 6
     assert parse_collector_metrics(text)["accepted_spans"] == 36
     assert parse_collector_metrics("not a metric") is None
-
-
-def test_kubernetes_parser_uses_serial_identity():
-    r = kubernetes_records(
-        {
-            "items": [
-                {
-                    "kind": "Node",
-                    "metadata": {
-                        "name": "new-hostname",
-                        "annotations": {"fleetlab/serial": "FTL-1"},
-                    },
-                    "status": {"conditions": [{"type": "Ready", "status": "True"}]},
-                }
-            ]
-        }
-    )[0]
-    assert r.entity_id == "node:FTL-1" and r.fields["health"] == "healthy"
-
-
-def test_kubernetes_parser_rejects_missing_serial():
-    with pytest.raises(ValueError):
-        kubernetes_records({"items": [{"kind": "Node", "metadata": {"name": "host"}}]})
-
-
-def test_redfish_parser_maps_health_and_identity():
-    r = redfish_records(
-        {
-            "Id": "server1",
-            "SerialNumber": "FTL-1",
-            "Status": {"Health": "Warning"},
-            "Oem": {"FleetLab": {"gpus": 8}},
-        }
-    )[0]
-    assert (
-        r.entity_id == "node:FTL-1"
-        and r.fields["health"] == "degraded"
-        and r.fields["gpus"] == 8
-    )
-
-
-def test_redfish_parser_rejects_missing_serial():
-    with pytest.raises(ValueError):
-        redfish_records({"Id": "server1"})

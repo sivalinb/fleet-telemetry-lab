@@ -19,3 +19,8 @@ playwright-report/
 .coverage
 htmlcov/
 dist/
+.dependency-install.log
+
+/evidence/*
+!/evidence/README.md
+!/evidence/verification-summary.json

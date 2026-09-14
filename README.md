@@ -1,19 +1,23 @@
-# Fleet Atlas
+# Telemetry Reliability Lab
 
-**Know what you operate. Follow the signal when it breaks.**
+**Find where telemetry is lost, and verify what survives.**
 
-A Python infrastructure portfolio project by [Siva Babu](https://github.com/sivalinb). It includes a **Gradio telemetry reliability workbench** and a Streamlit fleet catalog:
+A Python and Gradio workbench by [Siva Babu](https://github.com/sivalinb). Real HTTP workloads and OTLP probes exercise OpenTelemetry Collector, Prometheus, Loki, and Jaeger under bounded failures. Saved results distinguish upstream acceptance, queue admission, backend delivery, and recovery.
 
-1. **Fleet catalog** — reconcile infrastructure identity, ownership, and dependencies across multiple sources. Inspect provenance, stale observations, conflicting owners, and lifecycle history.
-2. **Signal lab** — send real HTTP requests through three Python services, then run nine experiments covering delivery, cardinality, slow services, exporter outages, persistent versus in-memory crash recovery, retry exhaustion, and queue saturation.
+![Telemetry architecture](docs/assets/telemetry.svg)
 
-![Fleet Atlas architecture](docs/assets/architecture.svg)
+## Capabilities
 
-The inventory is fictional: 2 clusters, 4 racks, 12 nodes, 6 services, and 3 teams. The 96 GPU slots are modeled inventory. **Telemetry experiments run actual Python CPU work and real OpenTelemetry, Prometheus, Loki, and Jaeger processes. They do not demonstrate GPU performance or production deployment.**
+- Nine experiments cover baseline delivery, metric cardinality, instrumentation contracts, slow services, backend outages, persistent and in-memory crashes, retry exhaustion, and queue saturation.
+- Each run records its hypothesis, configuration, observed counters, trace/log IDs, assertions, and cleanup state.
+- Isolated collectors use their own ports and storage. A fresh canary distinguishes backend recovery from recovery of the original signals.
+- Gradio provides pipeline status, saved-run comparison, contract validation, and HTML/JSON evidence exports.
 
-## Start the Python demo
+The workload is synthetic CPU work. This project does not measure GPU performance or claim production readiness. The independent [Fleet Infrastructure Catalog](https://github.com/sivalinb/fleet-infrastructure-catalog) owns inventory and reconciliation; it is not required to run this lab.
 
-Requirements: Python 3.12 recommended (3.11+ supported), macOS or Linux on arm64/amd64, internet for the first dependency/tool download, and roughly 2 GB of free disk for binaries and lab data. Windows users can use WSL2 or the Compose option.
+## Installation
+
+Python 3.12 is recommended; Python 3.11+ is supported. Native observability binaries support macOS and Linux on arm64/amd64.
 
 ```sh
 git clone https://github.com/sivalinb/fleet-telemetry-lab.git
@@ -26,57 +30,29 @@ python scripts/install_tools.py
 python scripts/run_stack.py
 ```
 
-Open **http://127.0.0.1:7860** for the Gradio demo. Give the backends about 20 seconds to become ready. Ctrl-C stops the processes created by the launcher. The native path needs no Docker and keeps data in `.runtime/`. Official tool downloads are version pinned and checked against their published SHA-256 digests.
+The application listens on `127.0.0.1:7860`; the API reference is at `127.0.0.1:8001/docs`. Ctrl-C stops owned processes. State and logs are under `.runtime/`. Tool downloads use pinned official releases and SHA-256 verification.
 
-For the fleet catalog UI, use `python scripts/run_stack.py --demo streamlit` and open port 8501. For a smaller demo, `python scripts/run_stack.py --catalog-only` runs the catalog and Streamlit. The Signal lab explicitly shows that telemetry backends are unavailable.
+`docker compose up --build` provides an alternative with PostgreSQL. Native and Compose use the same published ports and should run separately. Published ports bind to loopback.
 
-Optional container path: `docker compose up --build`. It uses PostgreSQL for the catalog and mounts named data volumes. See [runtime differences](docs/ARCHITECTURE.md#runtime-paths). Do not run native and Compose simultaneously on the same ports. The checked-in configuration is a local lab; all published ports bind to loopback.
-
-## A five-minute telemetry walkthrough
-
-1. Run **Crash with a persistent queue**. Watch the backlog and verify all accepted probes recover after SIGKILL.
-2. Run **Crash with an in-memory queue**. Original signals are lost; a fresh canary proves backend recovery.
-3. Compare both rows in **History & comparison**, then load a run to inspect every assertion and download its HTML/JSON report.
-4. Try **Retry exhaustion** and **Fill the sending queue** to see where persistence stops helping.
-5. Run **Baseline**, **Cardinality growth**, or **Find the slow service** to investigate the three-service workload. Use **Instrumentation contract** to validate labels.
-
-A passing expected-loss run means the hypothesis was verified, not that every signal arrived. Read the [illustrated telemetry guide](docs/TELEMETRY_LAB.md) for the exact boundaries.
-
-## Present the project
-
-The [HTML demo keynote](docs/keynote.html) is a 12-slide pitch with presenter notes and an interactive replay of real crash-recovery results. Download the HTML to present offline, or open **http://127.0.0.1:8001/docs-guide/keynote.html** while the API is running. [Presentation instructions and talk timing](docs/KEYNOTE.md) explain the recorded and live demos. Rebuild it with `python scripts/build_keynote.py`.
-
-## Verify it
+## Verification
 
 ```sh
 python -m pytest
 .runtime/bin/promtool test rules observability/alerts.test.yaml
-# With the full Gradio stack running:
 python scripts/verify_reliability.py
-# Optional standalone 20-event WAL recovery check:
 python scripts/verify_recovery.py
 ```
 
-The reliability suite runs all nine scenarios against real backends, checks active cancellation and subprocess cleanup, and verifies the Gradio API, contract editor, and report downloads. [Test cases and results](docs/TESTING.md) describe what was exercised. Results are stored in [evidence/](evidence/); rerunning checks replaces the corresponding samples.
+The last two checks require the running stack. CI repeats Python tests, all nine real scenarios, Gradio API checks, crash recovery, and PostgreSQL persistence. [Evidence](evidence/) contains aggregate verification results; [testing](docs/TESTING.md) explains their boundaries.
 
-## Explore the implementation
+## Implementation
 
-| Area | Entry point |
+| Area | Code |
 | --- | --- |
-| Gradio telemetry demo | [gradio_app.py](gradio_app.py) / [Python UI](backend/fleetlab/demo.py) |
-| Fleet catalog demo | [streamlit_app.py](streamlit_app.py) |
-| API / interactive API docs | [backend/fleetlab/api.py](backend/fleetlab/api.py) / http://127.0.0.1:8001/docs |
-| Identity and reconciliation | [catalog.py](backend/fleetlab/catalog.py) |
-| Read-only source import | [import_source.py](scripts/import_source.py) / [examples](fixtures/README.md) |
-| Instrumentation and contract | [workload.py](backend/fleetlab/workload.py), [contracts.py](backend/fleetlab/contracts.py) |
-| Experiment runners | [telemetry.py](backend/fleetlab/telemetry.py), [isolation.py](backend/fleetlab/isolation.py), [job lifecycle](backend/fleetlab/jobs.py) |
-| Persistent queue / export configuration | [observability/](observability/) |
-| Illustrated field guide | [docs/](docs/OVERVIEW.md) / [portable HTML](docs/field-guide.html) |
+| Gradio interface | [ui.py](backend/fleetlab/ui.py) |
+| API and run lifecycle | [api.py](backend/fleetlab/api.py), [jobs.py](backend/fleetlab/jobs.py) |
+| Workload and instrumentation | [workload.py](backend/fleetlab/workload.py), [contracts.py](backend/fleetlab/contracts.py) |
+| Failure orchestration | [telemetry.py](backend/fleetlab/telemetry.py), [isolation.py](backend/fleetlab/isolation.py) |
+| Backend configuration | [observability](observability/) |
 
-All application, importer, orchestration, test, and guide-generation code is Python. Gradio, Streamlit, and Plotly render the interfaces; standard configuration files describe the third-party observability services. No custom JavaScript application is required.
-
-## Documentation
-
-[Telemetry workbench](docs/TELEMETRY_LAB.md) · [What it solves](docs/OVERVIEW.md) · [Architecture](docs/ARCHITECTURE.md) · [Technologies](docs/TECHNOLOGIES.md) · [Test cases](docs/TESTING.md) · [Scaling](docs/SCALING.md) · [Extension plan](docs/ROADMAP.md) · [Runbooks](docs/RUNBOOKS.md)
-
-This is an inspectable lab, with explicit limits: one API worker, a full catalog projection on each import, local authentication only, bounded experiments, local log storage, and ephemeral Jaeger trace storage. It does not include a live GPU cluster, a full CMDB product, an ML model, or an AI agent. The roadmap describes concrete extensions without presenting them as implemented.
+[Architecture](docs/ARCHITECTURE.md) · [Technical guide](docs/TELEMETRY_LAB.md) · [Technologies](docs/TECHNOLOGIES.md) · [Scaling](docs/SCALING.md) · [Extensions](docs/EXTENSIONS.md) · [HTML overview](docs/keynote.html)

@@ -1,6 +1,7 @@
 """Durable experiment records and the public scenario contract."""
 
 from copy import deepcopy
+
 from .models import Experiment
 
 SCENARIO_CATALOG = [

@@ -3,14 +3,33 @@
 import html
 import json
 from pathlib import Path
+
 from .runs import SCENARIOS_BY_ID
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def public_result(result):
-    # Leave measured values intact; remove the workstation prefix from source paths.
-    return json.loads(json.dumps(result).replace(str(ROOT) + "/", ""))
+    """Keep measured results while excluding workstation-identifying metadata."""
+
+    def private(key):
+        key = str(key).lower().replace(".", "_")
+        return key in {"hostname", "code_file_path", "code_filepath"} or key.startswith(
+            ("host_", "process_")
+        )
+
+    def clean(value):
+        if isinstance(value, dict):
+            return {key: clean(item) for key, item in value.items() if not private(key)}
+        if isinstance(value, list):
+            return [
+                clean(item)
+                for item in value
+                if not (isinstance(item, dict) and private(item.get("key", "")))
+            ]
+        return value
+
+    return clean(json.loads(json.dumps(result).replace(str(ROOT) + "/", "")))
 
 
 def delivery_summary(result):

@@ -1,6 +1,6 @@
+import httpx
 from fastapi.testclient import TestClient
 from fleetlab import relay
-import httpx
 
 
 def test_fault_is_bounded_and_recovers(monkeypatch):

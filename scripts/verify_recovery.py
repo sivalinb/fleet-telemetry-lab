@@ -1,17 +1,18 @@
 """Crash an isolated real Collector with queued data; verify its WAL replays.
 
-Only kills subprocesses created by this script. Existing demo processes are untouched.
+Only kills subprocesses created by this script. Existing application processes are untouched.
 Uses a second Collector + relay on separate loopback ports and the running Loki/Jaeger.
 """
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import time
+from pathlib import Path
 from uuid import uuid4
+
 import httpx
 import yaml
 from fleetlab.telemetry import parse_collector_metrics
