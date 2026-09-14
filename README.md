@@ -42,6 +42,10 @@ Optional container path: `docker compose up --build`. It uses PostgreSQL for the
 
 A passing expected-loss run means the hypothesis was verified, not that every signal arrived. Read the [illustrated telemetry guide](docs/TELEMETRY_LAB.md) for the exact boundaries.
 
+## Present the project
+
+The [HTML demo keynote](docs/keynote.html) is a 12-slide pitch with presenter notes and an interactive replay of real crash-recovery results. Download the HTML to present offline, or open **http://127.0.0.1:8001/docs-guide/keynote.html** while the API is running. [Presentation instructions and talk timing](docs/KEYNOTE.md) explain the recorded and live demos. Rebuild it with `python scripts/build_keynote.py`.
+
 ## Verify it
 
 ```sh
