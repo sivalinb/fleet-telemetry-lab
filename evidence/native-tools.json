@@ -1,0 +1,30 @@
+[
+  {
+    "name": "collector",
+    "version": "0.160.0",
+    "asset": "otelcol-contrib_0.160.0_darwin_arm64.tar.gz",
+    "sha256": "ceb5309ba16f2587dbef765d54e15c803354d038b0495b0b691e1eb9876d17c9",
+    "url": "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.160.0/otelcol-contrib_0.160.0_darwin_arm64.tar.gz"
+  },
+  {
+    "name": "prometheus",
+    "version": "3.14.0",
+    "asset": "prometheus-3.14.0.darwin-arm64.tar.gz",
+    "sha256": "a9623f7f4fe65b1b171b423c1a72bbf23dfdf41a171dcb33e7dd302af80dc01c",
+    "url": "https://github.com/prometheus/prometheus/releases/download/v3.14.0/prometheus-3.14.0.darwin-arm64.tar.gz"
+  },
+  {
+    "name": "loki",
+    "version": "3.7.7",
+    "asset": "loki-darwin-arm64.zip",
+    "sha256": "14bd87f38e38651efa2ed709997fa156a7869384bd2cf6818c4606a56a96e1ae",
+    "url": "https://github.com/grafana/loki/releases/download/v3.7.7/loki-darwin-arm64.zip"
+  },
+  {
+    "name": "jaeger",
+    "version": "2.20.0",
+    "asset": "jaeger-2.20.0-darwin-arm64.tar.gz",
+    "sha256": "b2d21051b27f06535c288dd63e15a42d5aae653d0113695014d7e6b502736e5d",
+    "url": "https://github.com/jaegertracing/jaeger/releases/download/v2.20.0/jaeger-2.20.0-darwin-arm64.tar.gz"
+  }
+]

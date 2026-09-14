@@ -1,0 +1,17 @@
+{
+  "platform": "Darwin arm64",
+  "python": "3.12.14",
+  "unit_tests": 56,
+  "unit_failures": 0,
+  "unit_errors": 0,
+  "live_scenarios": {
+    "baseline": "passed",
+    "label-growth": "passed",
+    "contract-gate": "passed",
+    "slow-worker": "passed",
+    "backend-outage": "passed"
+  },
+  "recovery_passed": true,
+  "docker_runtime_tested_locally": false,
+  "scope": "Single-machine synthetic CPU workload and fixture inventory; no production or GPU capacity claim"
+}

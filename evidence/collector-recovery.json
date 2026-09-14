@@ -1,0 +1,46 @@
+{
+  "experiment_id": "51d177e1cd734674a8861f93f5f3101c",
+  "mechanism": "SIGKILL isolated Collector; restart same file_storage directory; restore backend relay",
+  "requests": 20,
+  "trace_ids": [
+    "1ac3abdf43874123837108c0950f499d",
+    "77acdaf67c704618acee119cece552f5",
+    "726c3eee9a7f4bfba7b929079f11b73d",
+    "2fc3af0af47746bcb5691f78ff3fc8b2",
+    "4c18bf3d912440ea933e71b8473495fc",
+    "463e8bea35ca4a7993ff64bc3867f693",
+    "3f9da03684ac4b5bb79413267e22bff3",
+    "c4ca18d98aa44d44a1163960afcfe161",
+    "4e703a4644504a4788fa29ef36d238a9",
+    "1028259c490c4d35ac8d8a3211375f01",
+    "e6ee6c83fe97444b84868738ee97ec56",
+    "e10e8c1c021a40618398fd5029e229d8",
+    "1555607479f14d5fa18c2f26df030cb7",
+    "1da8f581aacb47bd8251c5fe3dc43b16",
+    "9371a98366f14a2f9a21bd234f99e2e8",
+    "42b6d586b5da4c58b757d8667f8ac9f5",
+    "56739f42ebd7439e91b0849cca125d54",
+    "beb070501d454e14b0b03139a0d7d6f0",
+    "0209bd1317894bce95e7847e0424fb26",
+    "b26ae3f49bbf48bc91b6b4e40df6d931"
+  ],
+  "traces_recovered": 20,
+  "unique_logs_recovered": 20,
+  "queued_batches_before_crash": 12.0,
+  "wal_bytes": 262144,
+  "after": {
+    "queued_batches": 0.0,
+    "failed_exports": 0,
+    "accepted_spans": 0,
+    "accepted_logs": 0
+  },
+  "assertions": {
+    "backlog_before_crash": true,
+    "wal_written": true,
+    "all_traces_recovered": true,
+    "all_unique_logs_recovered": true,
+    "queue_drained": true
+  },
+  "passed": true,
+  "scope": "Only records that reached the persistent exporter queues; no exactly-once guarantee."
+}
