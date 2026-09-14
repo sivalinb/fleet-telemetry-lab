@@ -1,13 +1,12 @@
 """Build a portable HTML keynote from checked-in measurements, using Python only.
 
-HTML anchors, details, and radio inputs provide presentation navigation and the
+HTML anchors, details, radio inputs, and popovers provide navigation and the
 recorded demo. No JavaScript, framework, network fetch, or runtime is required.
 """
 
 import argparse
-import base64
-from html import escape
 import json
+from html import escape
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -34,9 +33,10 @@ def evidence_link(name, label="Recorded evidence"):
     return f'<a href="{REPO}/blob/{EVIDENCE_COMMIT}/evidence/reliability/{escape(name)}.json" target="_blank" rel="noopener">{escape(label)}</a>'
 
 
-def download(run):
-    data = base64.b64encode(json.dumps(run, indent=2).encode()).decode()
-    return f'<a class="download" href="data:application/json;base64,{data}" download="{escape(run["name"])}-evidence.json">Download this run’s evidence</a>'
+def evidence_view(run):
+    target = "evidence-" + escape(run["name"])
+    data = escape(json.dumps(run, indent=2))
+    return f'<button class="evidence-open" popovertarget="{target}">Inspect this run’s evidence</button><div class="evidence-panel" id="{target}" popover="auto" aria-label="Recorded evidence for {escape(run["name"])}"><button class="evidence-close" popovertarget="{target}" popovertargetaction="hide">Close evidence</button><h3>Full recorded evidence</h3><p class="caption">{escape(run["name"])}. Select and copy the JSON, or inspect the linked source file.</p><pre>{data}</pre></div>'
 
 
 def queue_chart(run, stage):
@@ -132,7 +132,7 @@ def replay_mode(run, mode):
         f'<div class="phase {key}"><figure>{queue_chart(run, key)}<figcaption class="caption">Measured samples. Lines connect observations. The later canary can briefly add two queue requests.</figcaption></figure><div><h3>{title}</h3><div class="big {"loss" if mode == "volatile" and key != "backlog" else "accent"}">{value}</div><p class="sub">{label}</p><p class="caption">{detail}</p></div></div>'
         for key, title, value, label, detail in stages
     )
-    return f'<div class="mode-view {mode}">{radios}<div class="phase-controls" role="group" aria-label="{mode.title()} replay stage">{controls}</div><div class="phase-panels">{panels}</div><p class="proof-tag">Saved run {run["id"]} / {run["duration_s"]} seconds total</p>{download(run)}</div>'
+    return f'<div class="mode-view {mode}">{radios}<div class="phase-controls" role="group" aria-label="{mode.title()} replay stage">{controls}</div><div class="phase-panels">{panels}</div><p class="proof-tag">Saved run {run["id"]} / {run["duration_s"]} seconds total</p>{evidence_view(run)}</div>'
 
 
 def build_keynote(demo_url="http://127.0.0.1:7860/"):
@@ -165,14 +165,14 @@ def build_keynote(demo_url="http://127.0.0.1:7860/"):
 
     def add(title, body, notes, *, style="", kicker="", sources=""):
         slides.append(
-            dict(
-                title=title,
-                body=body,
-                notes=notes,
-                style=style,
-                kicker=kicker,
-                sources=sources,
-            )
+            {
+                "title": title,
+                "body": body,
+                "notes": notes,
+                "style": style,
+                "kicker": kicker,
+                "sources": sources,
+            }
         )
 
     add(

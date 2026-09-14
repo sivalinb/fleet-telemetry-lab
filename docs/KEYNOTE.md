@@ -6,10 +6,11 @@ The keynote is a 12-slide engineering pitch for Telemetry Reliability Lab. It ex
 
 With the lab API running, open **http://127.0.0.1:8001/docs-guide/keynote.html**.
 
-You can also download `docs/keynote.html` and open it directly in a modern browser. The file contains its styles, charts, and downloadable replay evidence. The presentation and recorded demo need no server or network connection. External source links and the live Gradio demo still need their destinations to be available. GitHub's file viewer shows the HTML source, so download the file to present it.
+You can also download `docs/keynote.html` and open it directly in a modern browser. The file contains its styles, charts, and full replay evidence. The presentation and recorded demo need no server or network connection. External source links and the live Gradio demo still need their destinations to be available. GitHub's file viewer shows the HTML source, so download the file to present it.
 
 - **Next / Back:** move between slides. **Slides:** jump to a section.
 - **Notes:** open the talk track for the current slide. Close it before continuing.
+- **Inspect this run’s evidence:** view the complete recorded JSON inside the demo slide. Close the viewer with its button, Escape, or a click outside it.
 - **Keyboard:** use Tab to focus a link or control, then Enter. Focused radio controls also support the browser's arrow-key behavior. Browser Back and Forward follow slide history.
 - **Full screen:** use your browser's full-screen control. The deck uses native HTML navigation, without a custom fullscreen script.
 - **Print:** the print stylesheet includes all 12 slides, hides presentation controls, and shows the persistent queue's final recorded result on the demo slide. Choose landscape if your browser overrides the declared page size. Print-preview behavior can vary by browser.
@@ -42,6 +43,6 @@ python scripts/build_keynote.py --demo-url https://your-demo.example
 
 Edit the slide copy and notes in `scripts/build_keynote.py`; edit the layout in `docs/keynote.css`. The generator embeds the CSS and evidence into `docs/keynote.html`. It rejects nonpassing source runs instead of turning them into a verified result.
 
-All presentation generation is Python. The HTML uses anchors, details elements, and radio inputs for navigation and replay. There is no custom JavaScript, CDN, tracking, or external font dependency.
+All presentation generation is Python. The HTML uses anchors, details elements, radio inputs, and native popovers for navigation and replay. There is no custom JavaScript, CDN, tracking, or external font dependency. Use a current Chrome, Edge, Firefox, or Safari release with native HTML popover support.
 
 The verification slide cites the tested lab at commit `586fd11`, and the related CI run. Keep that provenance aligned if you replace the underlying evidence. The scalability numbers are explicitly illustrative. The deck makes no production deployment, GPU benchmark, or financial-return claim.
