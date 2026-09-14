@@ -1,0 +1,517 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fleet Atlas — Illustrated Field Guide</title><style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f2f6fb;color:#1c3551;font:17px/1.65 system-ui,-apple-system,sans-serif}header{background:#102d4a;color:#fff;padding:76px max(6vw,24px)}header small{color:#80ddd7;letter-spacing:.18em;font-weight:700}header h1{font-size:clamp(46px,7vw,82px);letter-spacing:-.055em;line-height:1.05;margin:22px 0}header p{font-size:21px;max-width:780px;color:#c0d4e6}header a{color:#80ddd7}.layout{display:grid;grid-template-columns:270px minmax(0,1000px);gap:48px;max-width:1420px;padding:48px 32px;margin:auto}nav{position:sticky;top:24px;height:max-content}nav a{display:block;text-decoration:none;border-bottom:1px solid #d4dfeb;padding:12px 0;color:#35516e;font-size:14px}nav span{color:#007f86;margin-right:12px}section{background:#fff;padding:42px;margin-bottom:30px;border:1px solid #dce5ef;border-radius:18px;scroll-margin-top:20px}section>h1{font-size:36px;letter-spacing:-.04em;line-height:1.15;margin-top:4px}h2{font-size:25px;letter-spacing:-.025em;margin-top:36px}.chapter{font-size:12px;color:#007f86;font-weight:700;letter-spacing:.14em}a{color:#195eab}p{margin:16px 0}table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.5;margin:24px 0}th,td{border-bottom:1px solid #dce5ef;padding:12px;text-align:left;vertical-align:top}th{background:#eaf2fa;color:#214b71}tr:nth-child(even){background:#f7f9fc}pre{padding:20px;background:#102d4a;color:#d9edf5;border-radius:12px;overflow:auto;font-size:13px;line-height:1.65}code{font-family:ui-monospace,monospace;font-size:.87em}svg{display:block;width:100%;height:auto;margin:28px 0}footer{padding:40px;text-align:center;color:#5b738d;font-size:14px}@media(max-width:950px){.layout{display:block;padding:20px}nav{position:static;margin-bottom:24px;display:grid;grid-template-columns:1fr 1fr;gap:0 20px}section{padding:24px;overflow-x:auto}table{min-width:560px}}@media print{body{background:#fff;font-size:11pt}header{padding:30px}header h1{font-size:40pt}.layout{display:block;padding:0}nav{display:none}section{break-before:page;border:0;padding:20px}h2,h1{break-after:avoid}tr,pre{break-inside:avoid}a{color:inherit}svg{max-height:680px}footer{display:none}}</style></head><body><header><small>PYTHON INFRASTRUCTURE LAB / SIVA BABU</small><h1>Know the fleet.<br>Follow the signal.</h1><p>An illustrated guide to source reconciliation, service ownership, observability, and failure recovery — with runnable code and inspectable evidence.</p><a href="https://github.com/sivalinb/fleet-telemetry-lab">Explore the public repository →</a></header><div class="layout"><nav aria-label="Chapters"><a href="#overview"><span>01</span>Two views of the same infrastructure</a><a href="#architecture"><span>02</span>Architecture and data flow</a><a href="#technologies"><span>03</span>Technology choices</a><a href="#testing"><span>04</span>Test cases and verification</a><a href="#scaling"><span>05</span>Scaling without hiding the current limits</a><a href="#roadmap"><span>06</span>Extension plan</a><a href="#runbooks"><span>07</span>Operating the lab</a></nav><main><section id="overview"><p class="chapter">CHAPTER 01</p><h1 id="two-views-of-the-same-infrastructure">Two views of the same infrastructure</h1>
+<p>When inventory, service ownership, and telemetry live in separate systems, a simple question becomes expensive: <strong>What is affected, who owns it, and what evidence should I inspect?</strong> Fleet Atlas makes that question concrete in a small, runnable lab.</p>
+<h2 id="project-1-a-catalog-with-reasons-behind-its-answers">Project 1 — A catalog with reasons behind its answers</h2>
+<p>The fleet catalog joins a service catalog, Kubernetes observations, and Redfish/BMC observations. A machine is identified by a stable serial-based key such as <code>node:FTL-A11</code>. A changed hostname updates an observation; it does not create a second physical machine.</p>
+<p>Each field has a selected value, source, and observation time. Ownership prefers the service catalog. Serial, model, accelerator count, and rack placement prefer Redfish. Other fields follow source priority, then observation time, then source ID for deterministic ties. Conflicting owner claims remain visible even when a winner can be selected.</p>
+<p>The interactive graph connects clusters, racks, nodes, services, and teams. Selecting a node reveals services that depend on it directly or transitively. This is <strong>dependency exposure</strong>, not a claim that every listed service is down: redundancy, traffic, and health are separate concerns.</p>
+<p>Source disappearance is not deletion. A full snapshot can mark an observation absent while another source still reports the entity. Even when all sources withdraw it, the last known record and audit history remain. Freshness is evaluated on reads, so a quiet source becomes stale without needing another import.</p>
+<h2 id="project-3-a-telemetry-reliability-lab-with-receipts">Project 3 — A telemetry reliability lab with receipts</h2>
+<p>Three instrumented Python services make real HTTP calls: gateway → scheduler → worker. The worker hashes bytes and can add an explicit delay. Each request emits a propagated trace, two structured logs per service, a counter increment, and a duration histogram.</p>
+<p>The Collector receives OTLP over HTTP. Prometheus scrapes metrics. A Python fault relay sits between the Collector and Loki/Jaeger so an experiment can return 503 temporarily and let the real exporter retry queues respond.</p>
+<table>
+<thead>
+<tr>
+<th>Experiment</th>
+<th>Question answered</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Baseline</td>
+<td>Did the request produce usable telemetry?</td>
+<td>Complete three-service traces, gateway logs, exported counters</td>
+</tr>
+<tr>
+<td>Label growth</td>
+<td>What happens if request IDs become metric labels?</td>
+<td>Three added counter series per request</td>
+</tr>
+<tr>
+<td>Contract gate</td>
+<td>Can we prevent that instrumentation mistake?</td>
+<td>Rejected requests, no added service work, no gateway events</td>
+</tr>
+<tr>
+<td>Slow worker</td>
+<td>Can a trace locate the introduced delay?</td>
+<td>Worker spans at least 180 ms</td>
+</tr>
+<tr>
+<td>Backend outage</td>
+<td>Does a short export failure lose this workload?</td>
+<td>Actual 503 responses, queued batches, drained queue, recovered traces/logs</td>
+</tr>
+<tr>
+<td>Collector crash</td>
+<td>Does queued telemetry survive an abrupt process loss?</td>
+<td>A killed/restarted isolated Collector, persistent storage, recovered unique events</td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-is-real-and-what-is-modeled">What is real, and what is modeled?</h2>
+<p><strong>Real execution:</strong> Python HTTP calls, SQL persistence, source reconciliation, OTLP encoding/export, PromQL and LogQL queries, trace retrieval, injected exporter failures, and process restart recovery.</p>
+<p><strong>Modeled context:</strong> the fleet, teams, rack locations, GPU counts, and service-to-node placement. All names and sample data are invented. No Apple, Oracle, NVIDIA, or other employer infrastructure data is used.</p>
+<p><strong>Future work:</strong> live cluster polling, incident SaaS integration, an AI evidence assistant, multitenancy, distributed catalog processing, durable production trace storage, GPU workloads, and production capacity validation.</p>
+<p>The two projects deliberately share canonical service/node identities. The catalog supplies ownership context; the Signal lab shows the evidence trail for services represented by that catalog. The current workload uses the fixture mapping rather than dynamically scheduling onto physical machines.</p></section><section id="architecture"><p class="chapter">CHAPTER 02</p><h1 id="architecture-and-data-flow">Architecture and data flow</h1>
+<p><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 980" role="img" aria-label="Know the fleet. Verify the signal."><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8096ac"/></marker></defs><rect width="1280" height="980" rx="24" fill="#f1f6fc"/><text x="48" y="48" font-family="Arial, sans-serif" font-size="12" fill="#5b738d" font-weight="700">FLEET ATLAS  /  ENGINEERING FIELD GUIDE</text><text x="48" y="96" font-family="Arial, sans-serif" font-size="34" fill="#102d4a" font-weight="700">Know the fleet. Verify the signal.</text><text x="48" y="128" font-family="Arial, sans-serif" font-size="17" fill="#5b738d" font-weight="400">Two Python projects, one Streamlit workspace. Fictional infrastructure; real telemetry delivery.</text><text x="48" y="179" font-family="Arial, sans-serif" font-size="14" fill="#007f86" font-weight="700">01  /  FLEET CATALOG</text><rect x="48" y="200" width="265" height="180" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="218" width="4" height="144" rx="2" fill="#007f86"/><text x="68" y="229" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">OBSERVE</text><text x="68" y="258" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Source snapshots</text><text x="68" y="285" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Service catalog ownership</text><text x="68" y="308" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Kubernetes node / service data</text><text x="68" y="331" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Redfish identity / hardware</text><rect x="365" y="200" width="265" height="180" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="366" y="218" width="4" height="144" rx="2" fill="#007f86"/><text x="385" y="229" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">RECONCILE</text><text x="385" y="258" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Python + FastAPI</text><text x="385" y="285" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Validate + replay protection</text><text x="385" y="308" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Field priority + provenance</text><text x="385" y="331" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Conflicts, freshness, absence</text><rect x="685" y="200" width="260" height="180" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="686" y="218" width="4" height="144" rx="2" fill="#007f86"/><text x="705" y="229" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">RETAIN</text><text x="705" y="258" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">SQL catalog</text><text x="705" y="285" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Sources + observations</text><text x="705" y="308" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Entities + sync runs + audit</text><text x="705" y="331" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">SQLite / PostgreSQL</text><path d="M313 286 L365 286" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M630 286 L685 286" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><text x="48" y="431" font-family="Arial, sans-serif" font-size="14" fill="#2466be" font-weight="700">02  /  SIGNAL LAB</text><rect x="48" y="450" width="265" height="180" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="468" width="4" height="144" rx="2" fill="#2466be"/><text x="68" y="479" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">GENERATE</text><text x="68" y="508" font-family="Arial, sans-serif" font-size="19.841269841269842" fill="#102d4a" font-weight="700">Three Python services</text><text x="68" y="535" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Gateway → scheduler → worker</text><text x="68" y="558" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">W3C traces + structured logs</text><text x="68" y="581" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Counters + duration histograms</text><rect x="365" y="450" width="265" height="180" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="366" y="468" width="4" height="144" rx="2" fill="#2466be"/><text x="385" y="479" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">COLLECT</text><text x="385" y="508" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">OTel Collector</text><text x="385" y="535" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">OTLP / HTTP + batching</text><text x="385" y="558" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Memory limiter</text><text x="385" y="581" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Persistent log / trace queues</text><rect x="685" y="450" width="260" height="180" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="686" y="468" width="4" height="144" rx="2" fill="#2466be"/><text x="705" y="479" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">EXERCISE</text><text x="705" y="508" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Python fault relay</text><text x="705" y="535" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Time-bounded HTTP 503</text><text x="705" y="558" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Real exporter retries</text><text x="705" y="581" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Original OTLP payloads</text><path d="M313 538 L365 538" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M630 538 L685 538" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><rect x="48" y="685" width="265" height="165" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="703" width="4" height="129" rx="2" fill="#2466be"/><text x="68" y="714" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">MEASURE</text><text x="68" y="743" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Prometheus</text><text x="68" y="770" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Scrapes workload counters</text><text x="68" y="793" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">And Collector self-metrics</text><rect x="365" y="685" width="265" height="165" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="366" y="703" width="4" height="129" rx="2" fill="#2466be"/><text x="385" y="714" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">INVESTIGATE</text><text x="385" y="743" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Loki + Jaeger</text><text x="385" y="770" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Logs by experiment identifier</text><text x="385" y="793" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Trace chain + span duration</text><rect x="685" y="685" width="260" height="165" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="686" y="703" width="4" height="129" rx="2" fill="#2466be"/><text x="705" y="714" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">PROVE</text><text x="705" y="743" font-family="Arial, sans-serif" font-size="16.975308641975307" fill="#102d4a" font-weight="700">Python experiment runner</text><text x="705" y="770" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Assertions + bounded polling</text><text x="705" y="793" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Evidence saved to SQL</text><path d="M495 630 L185 685" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M817 630 L500 685" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M630 768 L685 768" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><rect x="995" y="200" width="237" height="650" rx="16" fill="#102d4a" stroke="#102d4a"/><text x="1017" y="238" font-family="Arial, sans-serif" font-size="12" fill="#80ddd7" font-weight="700">03  /  DISCOVER</text><text x="1017" y="280" font-family="Arial, sans-serif" font-size="29" fill="#fff" font-weight="700">Streamlit</text><text x="1017" y="310" font-family="Arial, sans-serif" font-size="15" fill="#b5cede" font-weight="400">All UI logic in Python</text><text x="1017" y="366" font-family="Arial, sans-serif" font-size="20" fill="#fff" font-weight="700">Fleet catalog</text><text x="1017" y="394" font-family="Arial, sans-serif" font-size="15" fill="#b5cede" font-weight="400">Interactive topology</text><text x="1017" y="418" font-family="Arial, sans-serif" font-size="15" fill="#b5cede" font-weight="400">Owner + source inspector</text><text x="1017" y="442" font-family="Arial, sans-serif" font-size="15" fill="#b5cede" font-weight="400">Dependency exposure</text><text x="1017" y="526" font-family="Arial, sans-serif" font-size="20" fill="#fff" font-weight="700">Signal lab</text><text x="1017" y="554" font-family="Arial, sans-serif" font-size="15" fill="#b5cede" font-weight="400">Run five experiments</text><text x="1017" y="578" font-family="Arial, sans-serif" font-size="15" fill="#b5cede" font-weight="400">Trace / queue visuals</text><text x="1017" y="602" font-family="Arial, sans-serif" font-size="15" fill="#b5cede" font-weight="400">Download evidence</text><text x="1017" y="686" font-family="Arial, sans-serif" font-size="20" fill="#fff" font-weight="700">Field guide</text><text x="1017" y="714" font-family="Arial, sans-serif" font-size="15" fill="#b5cede" font-weight="400">Architecture + test cases</text><text x="1017" y="738" font-family="Arial, sans-serif" font-size="15" fill="#b5cede" font-weight="400">Technology + tradeoffs</text><text x="1017" y="762" font-family="Arial, sans-serif" font-size="15" fill="#b5cede" font-weight="400">Scaling + extensions</text><path d="M945 286 L995 286" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M945 768 L995 768" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><text x="48" y="909" font-family="Arial, sans-serif" font-size="12" fill="#007f86" font-weight="700">SHARED CONTEXT</text><text x="205" y="909" font-family="Arial, sans-serif" font-size="17" fill="#102d4a" font-weight="400">Canonical node, service, cluster, and owner identifiers connect the two views.</text><text x="48" y="954" font-family="Arial, sans-serif" font-size="13" fill="#5b738d" font-weight="400">Inventory models 96 GPU slots. The measured workload is CPU hashing; no GPU performance is claimed.</text></svg></p>
+<h2 id="catalog-path">Catalog path</h2>
+<p>Native JSON input → Python adapter → validated batch → SQL transaction → observations + resolved entities + audit → FastAPI → Streamlit.</p>
+<p><code>Source</code> records define priority and freshness. <code>Observation</code> is unique per source/external ID and points at a canonical entity. <code>SyncRun</code> stores a digest of the complete normalized batch. Replaying the same batch ID and contents returns an idempotent result; reusing the ID with different contents is a conflict. Older observations are rejected so delayed snapshots cannot roll back newer truth.</p>
+<p><code>Entity</code> is a materialized projection. Every imported batch rebuilds the small catalog inside its transaction. A failed batch rolls back its observations, projection, and history together. The API serializes catalog mutations within one process. <strong>Run one API worker</strong>; there is no distributed import lock in this version.</p>
+<p><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 700" role="img" aria-label="A value is useful when you can explain it."><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8096ac"/></marker></defs><rect width="1280" height="700" rx="24" fill="#f1f6fc"/><text x="48" y="48" font-family="Arial, sans-serif" font-size="12" fill="#5b738d" font-weight="700">FLEET ATLAS  /  ENGINEERING FIELD GUIDE</text><text x="48" y="96" font-family="Arial, sans-serif" font-size="34" fill="#102d4a" font-weight="700">A value is useful when you can explain it.</text><text x="48" y="128" font-family="Arial, sans-serif" font-size="17" fill="#5b738d" font-weight="400">Stable identity joins observations. Field policy selects values without hiding disagreements.</text><rect x="48" y="190" width="350" height="140" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="208" width="4" height="104" rx="2" fill="#007f86"/><text x="68" y="219" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">SERVICE CATALOG</text><text x="68" y="248" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">owner = team:inference</text><text x="68" y="275" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Authoritative ownership, observed at T1</text><rect x="48" y="355" width="350" height="140" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="373" width="4" height="104" rx="2" fill="#7055bb"/><text x="68" y="384" font-family="Arial, sans-serif" font-size="11" fill="#7055bb" font-weight="700">KUBERNETES</text><text x="68" y="413" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">owner = team:platform</text><text x="68" y="440" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Conflicting ownership, observed at T2</text><rect x="48" y="520" width="350" height="110" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="538" width="4" height="74" rx="2" fill="#2466be"/><text x="68" y="549" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">REDFISH</text><text x="68" y="578" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">serial = FTL-A11</text><text x="68" y="605" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Stable physical identity</text><path d="M398 260 L464 260" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M398 425 L464 425" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M398 570 L464 570" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><rect x="464" y="190" width="270" height="440" rx="16" fill="#102d4a" stroke="#102d4a"/><text x="488" y="232" font-family="Arial, sans-serif" font-size="13" fill="#80ddd7" font-weight="700">RECONCILIATION</text><text x="488" y="287" font-family="Arial, sans-serif" font-size="18" fill="#e1edf7" font-weight="400">1. Validate identity</text><text x="488" y="338" font-family="Arial, sans-serif" font-size="18" fill="#e1edf7" font-weight="400">2. Check batch replay</text><text x="488" y="389" font-family="Arial, sans-serif" font-size="18" fill="#e1edf7" font-weight="400">3. Reject older input</text><text x="488" y="440" font-family="Arial, sans-serif" font-size="18" fill="#e1edf7" font-weight="400">4. Apply field policy</text><text x="488" y="491" font-family="Arial, sans-serif" font-size="18" fill="#e1edf7" font-weight="400">5. Retain provenance</text><text x="488" y="542" font-family="Arial, sans-serif" font-size="18" fill="#e1edf7" font-weight="400">6. Commit atomically</text><path d="M734 410 L790 410" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><rect x="790" y="190" width="442" height="185" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="791" y="208" width="4" height="149" rx="2" fill="#007f86"/><text x="810" y="219" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">RESOLVED RECORD</text><text x="810" y="248" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">One entity, one chosen owner</text><text x="810" y="275" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">owner = team:inference</text><text x="810" y="298" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">provenance = service-catalog @ T1</text><text x="810" y="321" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">conflict = Kubernetes says team:platform</text><rect x="790" y="405" width="442" height="225" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="791" y="423" width="4" height="189" rx="2" fill="#7055bb"/><text x="810" y="434" font-family="Arial, sans-serif" font-size="11" fill="#7055bb" font-weight="700">HISTORY &amp; DATA QUALITY</text><text x="810" y="463" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Absence is a signal</text><text x="810" y="490" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Partial loss → source_absent</text><text x="810" y="513" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">All sources absent → unobserved</text><text x="810" y="536" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">TTL expired → source_stale</text><text x="810" y="559" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">References missing → visible finding</text><text x="48" y="674" font-family="Arial, sans-serif" font-size="13" fill="#5b738d" font-weight="400">A newer non-authoritative observation does not silently replace the authoritative owner.</text></svg></p>
+<p>The graph derives edges from <code>cluster</code>, <code>rack</code>, <code>owner</code>, <code>runsOn</code>, and <code>dependsOn</code>. An in-memory reverse adjacency traversal finds affected dependents without looping on cycles. Unknown references become data-quality issues. Backstage export emits Group, Component, and Resource entities with owner and dependency references; it does not require a Backstage installation.</p>
+<h2 id="signal-path">Signal path</h2>
+<p>The gateway propagates W3C trace context to the scheduler and worker. The instrumentation contract requires service, namespace, environment, cluster, and owner attributes. IDs useful for investigation belong in logs and spans. The deliberate label-growth scenario is the single test path that bypasses the metric-label contract.</p>
+<p>The Collector batches all signals. Logs and traces use separate bounded export queues backed by <code>file_storage</code>; metrics use a Prometheus exporter and scrape path. The fault relay returns 503 for a bounded period, then forwards the original OTLP payload to the configured backend. It cannot choose an arbitrary target from a user request.</p>
+<p>The experiment runner polls Jaeger and Loki for actual delivery. It saves request IDs, trace IDs, latency measurements, queue samples, assertions, and errors to SQL. Missing measurements remain unavailable; failed delivery cannot produce a passing result. Metric comparisons are scoped to the three running service instance IDs so a restarted process does not contaminate a new run's cardinality comparison.</p>
+<p><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="Crash the Collector. Keep the evidence."><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8096ac"/></marker></defs><rect width="1280" height="640" rx="24" fill="#f1f6fc"/><text x="48" y="48" font-family="Arial, sans-serif" font-size="12" fill="#5b738d" font-weight="700">FLEET ATLAS  /  ENGINEERING FIELD GUIDE</text><text x="48" y="96" font-family="Arial, sans-serif" font-size="34" fill="#102d4a" font-weight="700">Crash the Collector. Keep the evidence.</text><text x="48" y="128" font-family="Arial, sans-serif" font-size="17" fill="#5b738d" font-weight="400">A controlled restart test against the actual persistent exporter queues.</text><rect x="48" y="205" width="263" height="210" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="49" y="223" width="4" height="174" rx="2" fill="#2466be"/><text x="68" y="234" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">01 / BLOCK</text><text x="68" y="263" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Backend unavailable</text><text x="68" y="290" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Relay returns 503</text><text x="68" y="313" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">20 traces + 20 log events</text><rect x="355" y="205" width="263" height="210" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="356" y="223" width="4" height="174" rx="2" fill="#2466be"/><text x="375" y="234" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">02 / PERSIST</text><text x="375" y="263" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Wait for backlog</text><text x="375" y="290" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Verify accepted signals</text><text x="375" y="313" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Observe queued batches</text><rect x="662" y="205" width="263" height="210" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="663" y="223" width="4" height="174" rx="2" fill="#2466be"/><text x="682" y="234" font-family="Arial, sans-serif" font-size="11" fill="#2466be" font-weight="700">03 / CRASH</text><text x="682" y="263" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Abrupt process loss</text><text x="682" y="290" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">SIGKILL owned Collector</text><text x="682" y="313" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Restart with same WAL</text><rect x="969" y="205" width="263" height="210" rx="16" fill="#fff" stroke="#d4e0ee"/><rect x="970" y="223" width="4" height="174" rx="2" fill="#007f86"/><text x="989" y="234" font-family="Arial, sans-serif" font-size="11" fill="#007f86" font-weight="700">04 / RESTORE</text><text x="989" y="263" font-family="Arial, sans-serif" font-size="21" fill="#102d4a" font-weight="700">Verify recovery</text><text x="989" y="290" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Clear injected outage</text><text x="989" y="313" font-family="Arial, sans-serif" font-size="15" fill="#5b738d" font-weight="400">Find every unique event</text><path d="M311 305 L355 305" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M618 305 L662 305" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><path d="M925 305 L969 305" fill="none" stroke="#8096ac" stroke-width="2" marker-end="url(#arrow)"/><rect x="48" y="465" width="1184" height="100" rx="16" fill="#102d4a" stroke="#102d4a"/><text x="73" y="501" font-family="Arial, sans-serif" font-size="13" fill="#80ddd7" font-weight="700">THE GUARANTEE HAS A BOUNDARY</text><text x="73" y="535" font-family="Arial, sans-serif" font-size="17" fill="#e1edf7" font-weight="400">Only telemetry already in persistent export storage is covered by this test. Disk loss and queue limits still matter.</text><text x="48" y="614" font-family="Arial, sans-serif" font-size="13" fill="#5b738d" font-weight="400">Records are checked by unique IDs. Replay may duplicate delivery; exactly-once semantics are not claimed.</text></svg></p>
+<p>Persistent exporter storage protects data that reached those queues. It does <strong>not</strong> cover SDK buffers, the Collector batch processor before enqueue, disk loss, queue exhaustion, or retry expiry. Replay can duplicate data; this lab tests recovery of unique events, not exactly-once delivery. See the official <a href="https://opentelemetry.io/docs/collector/resiliency/">Collector resiliency guidance</a>.</p>
+<h2 id="runtime-paths">Runtime paths</h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Native quickstart</th>
+<th>Compose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python services</td>
+<td>Managed child processes</td>
+<td>Python 3.12 image, non-root application user</td>
+</tr>
+<tr>
+<td>Catalog</td>
+<td>SQLite with WAL, <code>.runtime/fleet.db</code></td>
+<td>PostgreSQL 17, named volume</td>
+</tr>
+<tr>
+<td>Collector queue</td>
+<td><code>.runtime/collector</code></td>
+<td>Named persistent volume</td>
+</tr>
+<tr>
+<td>Logs</td>
+<td>Local Loki filesystem</td>
+<td>Loki named volume</td>
+</tr>
+<tr>
+<td>Traces</td>
+<td>Jaeger in memory, 10,000-trace cap</td>
+<td>Same cap; intentionally ephemeral</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>Prometheus, 2-hour retention</td>
+<td>Prometheus named volume, 2-hour retention</td>
+</tr>
+<tr>
+<td>UI</td>
+<td>Streamlit, port 8501</td>
+<td>Streamlit, port 8501</td>
+</tr>
+</tbody>
+</table>
+<p>Native mode binds generated configurations to loopback. Compose publishes only loopback host ports and keeps workload/OTLP ports internal. Collector and Loki use root inside the local Compose containers to initialize their named storage directories; production deployment should pre-provision volume ownership and run them under dedicated UIDs.</p>
+<p>The database tables are created for a new lab on startup. No schema migration framework is included. Authentication is an optional shared API bearer token; it is not user authorization. Streamlit sends API requests on its server, so configuring an API token does not authenticate people who can reach Streamlit. Keep the demo local, or place every exposed surface behind an authenticated TLS proxy before sharing a hosted instance.</p>
+<p>The native path and SQL tests are the primary verification path. Compose syntax can be checked without a Docker daemon; only an actual container run validates image/runtime integration. Consult the evidence notes for what was run.</p></section><section id="technologies"><p class="chapter">CHAPTER 03</p><h1 id="technology-choices">Technology choices</h1>
+<table>
+<thead>
+<tr>
+<th>Technology</th>
+<th>What it does here</th>
+<th>Why it fits</th>
+<th>Tradeoff</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python 3.12</td>
+<td>Application, adapters, orchestration, tests, documentation generation</td>
+<td>One readable language across both projects</td>
+<td>CPU-bound work needs processes at higher load</td>
+</tr>
+<tr>
+<td>Streamlit + Plotly</td>
+<td>Interactive topology, source inspector, experiments, trace waterfall</td>
+<td>Python-native demo that is easy to run and inspect</td>
+<td>Rerun/session model; not a general multiuser frontend</td>
+</tr>
+<tr>
+<td>FastAPI + Pydantic</td>
+<td>HTTP contract, validation, experiment endpoints</td>
+<td>Explicit request models and generated API documentation</td>
+<td>One-process coordination in this lab</td>
+</tr>
+<tr>
+<td>SQLAlchemy</td>
+<td>Source observations, projections, history, evidence</td>
+<td>Transactions and a shared SQLite/PostgreSQL model</td>
+<td>Migrations and optimized bulk reconciliation remain future work</td>
+</tr>
+<tr>
+<td>SQLite</td>
+<td>Zero-service local catalog storage</td>
+<td>Durable local startup without Docker</td>
+<td>Single-writer, unsuitable for horizontal API scaling</td>
+</tr>
+<tr>
+<td>PostgreSQL 17</td>
+<td>Container/CI catalog storage</td>
+<td>Concurrent relational queries and a path to operational deployment</td>
+<td>Switching databases alone does not make the catalog distributed</td>
+</tr>
+<tr>
+<td>OpenTelemetry Python SDK</td>
+<td>Correlated traces, logs, counters, histograms</td>
+<td>One instrumentation model and W3C propagation</td>
+<td>SDK buffers are not durable</td>
+</tr>
+<tr>
+<td>OTel Collector contrib 0.160.0</td>
+<td>OTLP ingress, memory limiter, batching, persistent export</td>
+<td>Tests the actual delivery machinery</td>
+<td>Finite queue, local disk, finite retries</td>
+</tr>
+<tr>
+<td>Prometheus 3.14.0</td>
+<td>Scraping, counter-series comparisons, collector self-metrics</td>
+<td>Inspectable PromQL and direct cardinality evidence</td>
+<td>Local retention; historical process series must be scoped carefully</td>
+</tr>
+<tr>
+<td>Loki 3.7.7</td>
+<td>OTLP logs and structured metadata</td>
+<td>Query events by service/experiment without indexing every request ID</td>
+<td>Local filesystem storage and lab retention management</td>
+</tr>
+<tr>
+<td>Jaeger 2.20.0</td>
+<td>Distributed trace retrieval and UI</td>
+<td>Native macOS/Linux binaries and a direct trace API</td>
+<td>Lab uses ephemeral memory storage</td>
+</tr>
+<tr>
+<td>pytest + Streamlit AppTest</td>
+<td>Domain, API, relay, and UI behavior</td>
+<td>Automated failure-path and interaction checks</td>
+<td>AppTest does not replace visual browser inspection</td>
+</tr>
+<tr>
+<td>GitHub Actions</td>
+<td>Linux integration and PostgreSQL checks</td>
+<td>Reproducible evidence alongside the source</td>
+<td>Depends on runner/package availability</td>
+</tr>
+</tbody>
+</table>
+<p><code>requirements.lock</code> pins the Python environment used for verification. <code>pyproject.toml</code> declares compatible dependency ranges. <code>scripts/install_tools.py</code> pins official native binaries and verifies their published asset digest before execution. Application code is all Python; the standard backends are existing third-party tools, not Python reimplementations.</p>
+<h2 id="useful-primary-references">Useful primary references</h2>
+<ul>
+<li><a href="https://docs.streamlit.io/develop/api-reference/app-testing">Streamlit AppTest</a> describes the Python UI testing surface.</li>
+<li><a href="https://opentelemetry.io/docs/collector/resiliency/">OpenTelemetry Collector resilience</a> explains queue, retry, and persistent storage boundaries.</li>
+<li><a href="https://prometheus.io/docs/concepts/data_model/">Prometheus data model</a> explains why every distinct label set creates a series.</li>
+<li><a href="https://grafana.com/docs/loki/latest/send-data/otel/">Loki OTLP ingestion</a> covers resource labels and structured metadata.</li>
+<li><a href="https://backstage.io/docs/features/software-catalog/descriptor-format/">Backstage descriptor format</a> defines the exported entity shapes.</li>
+<li><a href="https://www.jaegertracing.io/docs/latest/architecture/">Jaeger architecture</a> explains its collection and storage components.</li>
+</ul>
+<p>There is no LLM dependency or API key. Adding an AI component should solve a measured investigation problem and come with evaluation, citations, access boundaries, and clear abstention behavior.</p></section><section id="testing"><p class="chapter">CHAPTER 04</p><h1 id="test-cases-and-verification">Test cases and verification</h1>
+<p>The lab separates deterministic correctness checks from live delivery experiments. Assertions test behavior rather than screenshots or static implementation details.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Trigger</th>
+<th>Expected result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stable identity</td>
+<td>Same serial, changed hostname</td>
+<td>One physical node; new name with provenance</td>
+</tr>
+<tr>
+<td>Replay</td>
+<td>Repeat identical source batch</td>
+<td>Idempotent success; no duplicate history</td>
+</tr>
+<tr>
+<td>Conflicting replay</td>
+<td>Reuse a batch ID with changed content</td>
+<td>Conflict; existing projection remains</td>
+</tr>
+<tr>
+<td>Event order</td>
+<td>Import older source snapshot</td>
+<td>Reject stale update</td>
+</tr>
+<tr>
+<td>Atomicity</td>
+<td>Batch contains incompatible kinds/duplicates</td>
+<td>Roll back whole batch</td>
+</tr>
+<tr>
+<td>Ownership</td>
+<td>Two sources disagree</td>
+<td>Authoritative owner retained; conflict shown</td>
+</tr>
+<tr>
+<td>Freshness</td>
+<td>Source ages past its TTL</td>
+<td>Staleness appears on the next read</td>
+</tr>
+<tr>
+<td>Disappearance</td>
+<td>Full snapshot omits one node</td>
+<td>Observation withdrawn; node retained and flagged</td>
+</tr>
+<tr>
+<td>Relationships</td>
+<td>Missing reference or cyclic dependencies</td>
+<td>Quality issue or bounded cycle-safe traversal</td>
+</tr>
+<tr>
+<td>Backstage export</td>
+<td>Export complete catalog</td>
+<td>Resolvable owner/dependency references</td>
+</tr>
+<tr>
+<td>API boundary</td>
+<td>Invalid batch, oversized body, wrong token</td>
+<td>Validation/size/authentication error</td>
+</tr>
+<tr>
+<td>Source parsers</td>
+<td>Native Redfish or K8s JSON</td>
+<td>Stable canonical identifiers and normalized fields</td>
+</tr>
+<tr>
+<td>Fault relay</td>
+<td>Outage or upstream network failure</td>
+<td>Retryable 503, bounded fault duration</td>
+</tr>
+<tr>
+<td>Streamlit</td>
+<td>Change scenario / select field guide</td>
+<td>Real API-backed state change; no UI exception</td>
+</tr>
+<tr>
+<td>Offline UI</td>
+<td>Catalog API unavailable</td>
+<td>Visible actionable error</td>
+</tr>
+</tbody>
+</table>
+<h2 id="live-experiment-assertions">Live experiment assertions</h2>
+<p>Run <code>python scripts/verify_stack.py</code> against the full native stack. It executes five sequential runs with 12 requests each and writes <code>evidence/live-experiments.json</code>.</p>
+<ul>
+<li><strong>Baseline:</strong> 12 completed requests, 12 complete gateway/scheduler/worker trace chains, at least 24 gateway logs, 36 service counter increments, and bounded series independent of request count.</li>
+<li><strong>Label growth:</strong> the same delivery checks plus exactly 36 new counter series (12 requests × 3 services).</li>
+<li><strong>Contract gate:</strong> 12 rejections before service work, no counter increase, and no gateway logs for that experiment.</li>
+<li><strong>Slow worker:</strong> complete delivery and every worker span containing at least the introduced 180 ms.</li>
+<li><strong>Backend outage:</strong> the relay actually rejects exports; the queue is observed nonempty, then drains; complete traces and expected logs are retrieved afterward.</li>
+</ul>
+<p>Metric scraping and backend indexing are asynchronous. The runner polls with deadlines rather than treating a transient empty response as a success. Unavailable values stay <code>null</code>. Latency values are observations from a laptop/runner and are not GPU or platform performance claims. A run executed alongside unrelated traffic may fail strict counter assertions; the intended lab is single-user with one experiment at a time.</p>
+<h2 id="abrupt-collector-restart">Abrupt Collector restart</h2>
+<p><code>python scripts/verify_recovery.py</code> owns a second Collector and relay on separate loopback ports. It blocks exports, sends 20 unique traces and 20 log events, waits for an exporter backlog, kills its Collector abruptly, restarts it with the same <code>file_storage</code> directory, restores export, and queries Jaeger/Loki for every unique event. The original demo Collector stays running.</p>
+<p>The evidence file records backlog depth, WAL bytes, recovered counts, trace IDs, and each assertion. Recovery of these events does not prove delivery for data still buffered upstream of the persistent queue, nor does it establish exactly-once behavior.</p>
+<h2 id="reproduce-all-checks">Reproduce all checks</h2>
+<pre><code class="language-sh">python -m pytest --junitxml=evidence/unit-tests.xml
+# With the native stack already running:
+python scripts/verify_stack.py
+python scripts/verify_recovery.py
+# In a clean environment, starts/stops its own full stack:
+python scripts/ci_integration.py
+</code></pre>
+<p><code>scripts/verify_postgres.py</code> requires an explicit <code>DATABASE_URL</code> pointing to a disposable PostgreSQL database. It checks seeded inventory, conflict reconciliation, graph queries, and persistence after the application restarts. GitHub Actions supplies that database in a dedicated job.</p>
+<p>See <a href="https://github.com/sivalinb/fleet-telemetry-lab/tree/main/evidence">the evidence directory</a> for the checked-in execution record and the distinction between local verification and CI verification. CI artifacts are new measurements; checked-in evidence is a point-in-time sample, not a live status badge.</p></section><section id="scaling"><p class="chapter">CHAPTER 05</p><h1 id="scaling-without-hiding-the-current-limits">Scaling without hiding the current limits</h1>
+<p>The checked-in fleet has 27 entities. The API accepts at most 5,000 records per batch and 100 relationship references per list. These are validation limits, <strong>not measured capacity claims</strong>. This version rebuilds the full projection and loads the graph into memory. It has not been benchmarked for large fleets or multiuser production traffic.</p>
+<p><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 730" role="img" aria-label="Scale the evidence, then scale the system."><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8096ac"/></marker></defs><rect width="1280" height="730" rx="24" fill="#f1f6fc"/><text x="48" y="48" font-family="Arial, sans-serif" font-size="12" fill="#5b738d" font-weight="700">FLEET ATLAS  /  ENGINEERING FIELD GUIDE</text><text x="48" y="96" font-family="Arial, sans-serif" font-size="34" fill="#102d4a" font-weight="700">Scale the evidence, then scale the system.</text><text x="48" y="128" font-family="Arial, sans-serif" font-size="17" fill="#5b738d" font-weight="400">An extension path with verification gates, not an unmeasured throughput promise.</text><rect x="48" y="190" width="1184" height="105" rx="16" fill="#fff" stroke="#d4e0ee"/><text x="73" y="251" font-family="Arial, sans-serif" font-size="32" fill="#007f86" font-weight="700">01</text><text x="153" y="232" font-family="Arial, sans-serif" font-size="23" fill="#102d4a" font-weight="700">Runnable lab</text><text x="540" y="227" font-family="Arial, sans-serif" font-size="17" fill="#5b738d" font-weight="400">27 entities · one API worker · full projection</text><text x="540" y="259" font-family="Arial, sans-serif" font-size="16" fill="#5b738d" font-weight="400">Prove identity, ownership, delivery, and recovery</text><rect x="48" y="315" width="1184" height="105" rx="16" fill="#fff" stroke="#d4e0ee"/><text x="73" y="376" font-family="Arial, sans-serif" font-size="32" fill="#2466be" font-weight="700">02</text><text x="153" y="357" font-family="Arial, sans-serif" font-size="23" fill="#102d4a" font-weight="700">Growing fleet</text><text x="540" y="352" font-family="Arial, sans-serif" font-size="17" fill="#5b738d" font-weight="400">Incremental reconciliation · bulk upserts · indexed edges</text><text x="540" y="384" font-family="Arial, sans-serif" font-size="16" fill="#5b738d" font-weight="400">Compare results to the full-rebuild oracle and measure p95</text><rect x="48" y="440" width="1184" height="105" rx="16" fill="#fff" stroke="#d4e0ee"/><text x="73" y="501" font-family="Arial, sans-serif" font-size="32" fill="#7055bb" font-weight="700">03</text><text x="153" y="482" font-family="Arial, sans-serif" font-size="23" fill="#102d4a" font-weight="700">Multiple sites and teams</text><text x="540" y="477" font-family="Arial, sans-serif" font-size="17" fill="#5b738d" font-weight="400">Partitioned sources · durable jobs · regional Collector gateways</text><text x="540" y="509" font-family="Arial, sans-serif" font-size="16" fill="#5b738d" font-weight="400">Prove concurrency, isolation, outage capacity, and restore</text><rect x="48" y="565" width="1184" height="105" rx="16" fill="#fff" stroke="#d4e0ee"/><text x="73" y="626" font-family="Arial, sans-serif" font-size="32" fill="#102d4a" font-weight="700">04</text><text x="153" y="607" font-family="Arial, sans-serif" font-size="23" fill="#102d4a" font-weight="700">Operational platform</text><text x="540" y="602" font-family="Arial, sans-serif" font-size="17" fill="#5b738d" font-weight="400">OIDC / RBAC · HA storage · migrations · measured SLOs</text><text x="540" y="634" font-family="Arial, sans-serif" font-size="16" fill="#5b738d" font-weight="400">Exercise failure boundaries before expanding the scope</text><text x="48" y="704" font-family="Arial, sans-serif" font-size="13" fill="#5b738d" font-weight="400">Queue planning: peak batches/second × outage seconds × headroom. Validate bytes, drain rate, and data loss in a load test.</text></svg></p>
+<h2 id="catalog-scaling">Catalog scaling</h2>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Change</th>
+<th>Verification before rollout</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Current lab</td>
+<td>Single API process, SQLite/PostgreSQL, transaction per import</td>
+<td>Atomicity, replay, stale inputs, graph cycles</td>
+</tr>
+<tr>
+<td>Thousands of records</td>
+<td>Bulk upserts, indexed relationships, incremental reconciliation of touched entities</td>
+<td>Compare incremental results against the full-rebuild oracle; measure p95 import and query latency</td>
+</tr>
+<tr>
+<td>Multiple collectors/teams</td>
+<td>Source partitioning, durable ingestion queue, per-source cursors, database advisory locks</td>
+<td>Duplicate, reordered, missing, and concurrent batches; recovery from worker loss</td>
+</tr>
+<tr>
+<td>Large catalogs</td>
+<td>Paginated queries, server-side search, graph neighborhoods, read projections/caching</td>
+<td>Memory per request; cache invalidation; bounded traversal depth and completeness metadata</td>
+</tr>
+<tr>
+<td>Operational service</td>
+<td>Tenant-scoped authorization, migration management, backup/restore, SLOs</td>
+<td>Tenant isolation, restore drill, rollout/rollback, audit completeness</td>
+</tr>
+</tbody>
+</table>
+<p>Preserve raw source evidence and reconciliation policy versions. A corrected policy should allow a deterministic rebuild. Do not replace stable physical identity with hostname matching. Keep absence, deletion, decommissioning, and stale observation as separate lifecycle concepts.</p>
+<h2 id="telemetry-scaling">Telemetry scaling</h2>
+<p>Separate local collection from regional gateways. Partition load by site/cluster and keep the Collector memory limiter, queues, and storage monitored. Increase consumers only after measuring backend capacity; one consumer per signal is intentionally configured here to make queue behavior visible with a small workload.</p>
+<p>Queue sizing starts with measured export batches, not request count:</p>
+<pre><code class="language-text">required queue batches ≈ peak accepted batches/second × tolerated outage seconds × headroom
+drain time ≈ backlog batches / (export capacity − incoming batches/second)
+</code></pre>
+<p>For an illustrative planning case, 80 batches/second, a 120-second outage, and 1.5× headroom imply 14,400 queued batches. If export capacity is 200 batches/second after recovery and intake stays at 80, a 9,600-batch backlog drains in about 80 seconds. These are calculations, not measurements from this repository. Size disk using observed serialized batch bytes and recovery overhead; do not equate batch count with bytes or event count.</p>
+<p>The lab queue limit is 2,000 batches <strong>per logs/traces exporter</strong>, with a 60-second retry horizon. Metrics use a scrape/export path and are not covered by those durable queues. Longer outages need deliberate capacity, retention, and durability decisions. A persistent queue is local to its process storage; losing the disk loses that protection.</p>
+<p>For durable shared backends, replace local Loki files with a supported object-storage deployment and Jaeger memory with a supported persistent storage backend. Add high availability and retention policies separately from ingestion scaling. Consider a message broker only if measured durability/decoupling requirements justify its operational cost.</p>
+<h2 id="cardinality-cost-and-useful-signals">Cardinality, cost, and useful signals</h2>
+<p>Estimate series as the product of label combinations across instruments and service instances. Request IDs create new combinations continuously; histogram buckets multiply the effect. The UI deliberately reports the request <strong>counter</strong> series to keep its 3×request comparison simple. It does not claim to count the complete histogram series cost.</p>
+<p>Keep environment, cluster, service, and owner consistent. Review whether owner changes should create new series or be joined at query time at larger scale. Place high-cardinality investigation fields in log metadata/spans, define retention by purpose, and preserve error/latency evidence when introducing sampling. Tail sampling requires routing complete traces to the same decision point.</p>
+<p>Before claiming a scale target, run a controlled benchmark with reproducible input sizes, ingest/query mixes, hardware specifications, p50/p95/p99 latency, process memory, queue occupancy, dropped data, and recovery time. Publish failure thresholds as well as successful runs.</p></section><section id="roadmap"><p class="chapter">CHAPTER 06</p><h1 id="extension-plan">Extension plan</h1>
+<p>These are planned extensions, not features implemented in the current demo. Each has an acceptance test so it can become a reviewable project increment.</p>
+<table>
+<thead>
+<tr>
+<th>Order</th>
+<th>Extension</th>
+<th>Small deliverable</th>
+<th>Acceptance evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Live source collectors</td>
+<td>Read-only Kubernetes pagination/watch and vendor-specific Redfish member resolution; polling checkpoints</td>
+<td>Reconnect, pagination, RBAC denial, incomplete snapshot protection, fixture replay</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Catalog operations</td>
+<td>Explicit decommission workflow, field policy configuration, Alembic migrations, scheduled refresh</td>
+<td>Migration rollback, audit lineage, no silent identity merge</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Service telemetry lookup</td>
+<td>Catalog-driven resource mapping and one-click service log/trace queries</td>
+<td>Unknown/mismatched service mapping shown; no stale owner hidden</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Incident workspace</td>
+<td>Draft incident from selected service, snapshot owner and evidence, timeline and post-incident template</td>
+<td>Repeat action is idempotent; historical ownership retained; external sends require explicit action</td>
+</tr>
+<tr>
+<td>5</td>
+<td>AI evidence assistant</td>
+<td>Read-only tools for inventory and telemetry, cited investigation suggestions, no autonomous remediation</td>
+<td>Eval set with correct cause, ambiguous cause, missing evidence, stale owner, malicious log content; measure abstention and citation correctness</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Real accelerator signals</td>
+<td>DCGM exporter + Redfish health ingestion on an explicitly provisioned GPU host</td>
+<td>Actual hardware/model/version recorded; compare sensor values to raw source; no synthetic performance claims</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Reliability experiments</td>
+<td>Queue saturation, disk exhaustion, partial backend failure, trace sampling, retry expiry, load ramp</td>
+<td>Expected data loss measured where guarantees end; no broad zero-loss claim</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Multiuser service</td>
+<td>OIDC, tenant-scoped RBAC, TLS ingress, rate limits, durable job queue, HA database</td>
+<td>Isolation checks, concurrent imports, restore drills, controlled rollout</td>
+</tr>
+</tbody>
+</table>
+<h2 id="an-ai-extension-worth-building">An AI extension worth building</h2>
+<p>Start with a question such as “Which services depend on this node, and what changed around this trace?” Give an assistant narrow, read-only tools that return provenance and freshness along with values. Treat log bodies, imported descriptions, and runbooks as untrusted data. Require source citations in generated answers and an explicit “insufficient evidence” response when the signals disagree.</p>
+<p>Create a small evaluation set before selecting an agent framework. Include a known worker delay, owner conflict, missing trace, delayed log, stale source, and an instruction embedded in log text. Score evidence retrieval, correct attribution, unsupported claims, and abstention. Compare the agent against a deterministic catalog/query workflow; keep it only if it improves the measured task.</p>
+<h2 id="suggested-next-three-increments">Suggested next three increments</h2>
+<p>First, make one real read-only source integration reliable under reconnect and partial results. Second, add schema migrations and a catalog refresh job with clear operational ownership. Third, connect an incident evidence bundle to the service inspector. These steps strengthen the infrastructure foundation before adding more UI or model dependencies.</p></section><section id="runbooks"><p class="chapter">CHAPTER 07</p><h1 id="operating-the-lab">Operating the lab</h1>
+<h2 id="start-inspect-stop">Start, inspect, stop</h2>
+<p>Run <code>python scripts/run_stack.py</code> from the repository with the virtual environment active. The launcher owns its child processes and stops them on Ctrl-C. It reports a failed child and the corresponding <code>.runtime/logs/&lt;service&gt;.log</code>. Do not run multiple copies or share the same ports with Compose.</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Native URL</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Streamlit</td>
+<td>http://127.0.0.1:8501</td>
+<td>Catalog, experiment runner, field guide</td>
+</tr>
+<tr>
+<td>FastAPI</td>
+<td>http://127.0.0.1:8001/docs</td>
+<td>API request/response contracts</td>
+</tr>
+<tr>
+<td>Prometheus</td>
+<td>http://127.0.0.1:9090</td>
+<td>Metrics, targets, PromQL</td>
+</tr>
+<tr>
+<td>Loki readiness</td>
+<td>http://127.0.0.1:3100/ready</td>
+<td>Log backend health</td>
+</tr>
+<tr>
+<td>Jaeger</td>
+<td>http://127.0.0.1:16686</td>
+<td>Trace UI</td>
+</tr>
+<tr>
+<td>Collector health</td>
+<td>http://127.0.0.1:13133</td>
+<td>Collector availability</td>
+</tr>
+<tr>
+<td>Collector self-metrics</td>
+<td>http://127.0.0.1:8888/metrics</td>
+<td>Accepted data, exporter queues</td>
+</tr>
+</tbody>
+</table>
+<p>The recovery script additionally uses 14318, 18888, 18889, 23133, and 18200. It cleans up its own temporary processes/storage when it finishes.</p>
+<h2 id="a-source-looks-stale-or-conflicts">A source looks stale or conflicts</h2>
+<p>Select the entity and inspect “Why this value?” Compare the chosen source to the conflicting evidence. A stale source's value is retained and flagged; it is not silently replaced just because another source is fresher. Decide whether the authoritative source should be corrected before changing policy.</p>
+<p>For the fictional demo, apply <strong>Healthy baseline</strong> to refresh all three sources and clear injected scenarios. This action restores the fixture values, so do not use it to maintain manually imported real inventory. The example importer defaults to incremental updates to avoid treating a small fixture as the whole fleet.</p>
+<h2 id="a-telemetry-experiment-is-incomplete">A telemetry experiment is incomplete</h2>
+<ol>
+<li>Check Signal lab backend readiness, then <code>.runtime/logs/</code> for errors.</li>
+<li>Inspect the saved assertions and request errors. A passing HTTP workload alone does not prove export.</li>
+<li>Check Prometheus targets and Collector queue occupancy. Metric export and log/trace indexing are asynchronous.</li>
+<li>Inspect the saved trace IDs in Jaeger and log metadata in Loki. The evidence JSON contains the exact observed counts.</li>
+<li>Retry after the failure is resolved; retain both run records for comparison.</li>
+</ol>
+<p>Loki can take about 15–20 seconds to become ready at startup. Jaeger trace data disappears on restart in this lab; experiment JSON remains in SQL and should be interpreted as the evidence captured at run time. Old service-instance metrics can remain in Prometheus; the UI scopes comparisons to current process IDs.</p>
+<p>If a run remains <code>running</code> after an API crash, it is an interrupted run, not a success. The current version stores the initial record and final result but does not have a durable background job scheduler or automatic cancellation recovery.</p>
+<h2 id="retention-and-local-storage">Retention and local storage</h2>
+<p>Catalog/audit/experiment data and Loki files persist under <code>.runtime/</code> in native mode. Prometheus retains two hours. Jaeger holds up to 10,000 traces in memory. The lab does not configure automatic Loki or SQL pruning; monitor disk and stop the lab when finished. Preserve any evidence you need before intentionally clearing your own runtime directory or Docker volumes.</p>
+<p>Workload request counts are bounded, but repeated <strong>Label growth</strong> runs accumulate metric series in the SDK and backends. Restart the lab processes to begin with new instance IDs. This is a demonstration of cardinality cost, not a sustained load generator.</p>
+<h2 id="sharing-and-deployment">Sharing and deployment</h2>
+<p>The public repository contains source, invented fixtures, and generated test evidence. It contains no credentials or private infrastructure inventory. To run a shared demo, provide authentication for Streamlit and every exposed API/observability UI, use TLS, isolate the fault relay, set budgets/rate limits, and replace lab storage/retention choices according to the intended audience.</p>
+<p><code>LAB_API_TOKEN</code> protects catalog and experiment API access plus relay controls when set. Native scripts inherit environment variables; <code>.env.example</code> is a reference and is <strong>not automatically loaded</strong>. Compose reads <code>.env</code> using Docker's normal interpolation. Do not commit an actual <code>.env</code> file.</p></section></main></div><footer>Fleet Atlas · Fictional infrastructure, real telemetry experiments · Generated entirely with Python.</footer></body></html>
