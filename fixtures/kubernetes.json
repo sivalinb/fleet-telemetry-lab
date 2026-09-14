@@ -1,0 +1,15 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "apiVersion": "v1", "kind": "Node",
+      "metadata": {"name": "alpine-11", "annotations": {"fleetlab/serial": "FTL-A11", "fleetlab/owner": "team:platform", "fleetlab/cluster": "cluster:alpine"}},
+      "status": {"conditions": [{"type": "Ready", "status": "True"}]}
+    },
+    {
+      "apiVersion": "apps/v1", "kind": "Deployment",
+      "metadata": {"namespace": "inference", "name": "worker", "annotations": {"fleetlab/service": "service:worker", "fleetlab/owner": "team:inference"}}
+    }
+  ]
+}

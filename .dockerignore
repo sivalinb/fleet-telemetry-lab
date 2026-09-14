@@ -1,0 +1,11 @@
+.venv
+.runtime
+.git
+.sites-runtime
+.openai
+__pycache__
+*.egg-info
+.pytest_cache
+.coverage
+.env
+dist

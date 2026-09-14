@@ -1,0 +1,90 @@
+name: fleet-telemetry-lab
+x-python: &python
+  build: .
+  restart: unless-stopped
+services:
+  postgres:
+    image: postgres:17.6
+    environment:
+      POSTGRES_USER: fleetlab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-lab-only}
+      POSTGRES_DB: fleetlab
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U fleetlab]
+      interval: 3s
+      retries: 20
+  api:
+    <<: *python
+    command: [python, -m, uvicorn, 'fleetlab.api:app_factory', --factory, --host, 0.0.0.0, --port, '8001']
+    environment:
+      DATABASE_URL: postgresql+psycopg://fleetlab:${POSTGRES_PASSWORD:-local-lab-only}@postgres/fleetlab
+      LAB_API_TOKEN: ${LAB_API_TOKEN:-}
+      PROMETHEUS_URL: http://prometheus:9090
+      LOKI_URL: http://loki:3100
+      JAEGER_URL: http://jaeger:16686
+      COLLECTOR_HEALTH_URL: http://collector:13133
+      COLLECTOR_METRICS_URL: http://collector:8888/metrics
+      RELAY_URL: http://relay:8200
+      GATEWAY_URL: http://gateway:8101
+      SCHEDULER_URL: http://scheduler:8102
+      WORKER_URL: http://worker:8103
+    ports: ['127.0.0.1:8001:8001']
+    depends_on:
+      postgres: {condition: service_healthy}
+  demo:
+    <<: *python
+    environment:
+      FLEET_API_URL: http://api:8001
+      LAB_API_TOKEN: ${LAB_API_TOKEN:-}
+    ports: ['127.0.0.1:8501:8501']
+    depends_on: [api]
+  gateway:
+    <<: *python
+    command: [python, -m, uvicorn, 'fleetlab.workload:app', --host, 0.0.0.0, --port, '8101']
+    environment: {SERVICE_NAME: gateway, COLLECTOR_URL: 'http://collector:4318', DOWNSTREAM_URL: 'http://scheduler:8102'}
+    depends_on: [collector, scheduler]
+  scheduler:
+    <<: *python
+    command: [python, -m, uvicorn, 'fleetlab.workload:app', --host, 0.0.0.0, --port, '8102']
+    environment: {SERVICE_NAME: scheduler, COLLECTOR_URL: 'http://collector:4318', DOWNSTREAM_URL: 'http://worker:8103'}
+    depends_on: [collector, worker]
+  worker:
+    <<: *python
+    command: [python, -m, uvicorn, 'fleetlab.workload:app', --host, 0.0.0.0, --port, '8103']
+    environment: {SERVICE_NAME: worker, COLLECTOR_URL: 'http://collector:4318'}
+    depends_on: [collector]
+  relay:
+    <<: *python
+    command: [python, -m, uvicorn, 'fleetlab.relay:app', --host, 0.0.0.0, --port, '8200']
+    environment:
+      LOKI_URL: http://loki:3100
+      JAEGER_OTLP_URL: http://jaeger:4319
+      LAB_API_TOKEN: ${LAB_API_TOKEN:-}
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.160.0
+    user: '0:0'
+    command: ['--config=/etc/otelcol/config.yaml']
+    volumes: ['./observability/collector.yaml:/etc/otelcol/config.yaml:ro', 'collector-data:/var/lib/fleetlab/collector']
+    depends_on: [relay]
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    command: ['--config.file=/etc/prometheus/prometheus.yaml', '--storage.tsdb.retention.time=2h']
+    volumes: ['./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro', 'prometheus-data:/prometheus']
+    ports: ['127.0.0.1:9090:9090']
+  loki:
+    image: grafana/loki:3.7.7
+    user: '0:0'
+    command: ['-config.file=/etc/loki/config.yaml']
+    volumes: ['./observability/loki.yaml:/etc/loki/config.yaml:ro', 'loki-data:/var/lib/fleetlab/loki']
+    ports: ['127.0.0.1:3100:3100']
+  jaeger:
+    image: jaegertracing/jaeger:2.20.0
+    command: ['--config=/etc/jaeger/config.yaml']
+    volumes: ['./observability/jaeger.yaml:/etc/jaeger/config.yaml:ro']
+    ports: ['127.0.0.1:16686:16686']
+volumes:
+  postgres-data:
+  collector-data:
+  prometheus-data:
+  loki-data:
